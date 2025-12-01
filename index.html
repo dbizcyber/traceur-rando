@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Traceur randonnée — corrected</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+<script src="https://unpkg.com/togpx@0.5.0/togpx.js"></script>
+<script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+
+<style>
+  body { margin:0; font-family: Arial, sans-serif; }
+  #map { height: 65vh; }
+
+  .leaflet-control.custom-panel {
+    background: rgba(255,255,255,0.96);
+    padding: 8px;
+    border-radius: 10px;
+    width: 240px;
+    max-width: 90vw;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  #distance { font-size: 14px; margin: 8px 0; }
+  #elevationChart { height: 160px !important; }
+
+  .icon-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-top:6px; }
+  .icon-btn { width:36px; height:36px; border-radius:50%; border:none; background:#2a66c7; color:#fff; font-size:16px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.25); }
+  .icon-btn.secondary { background:#666; }
+  .icon-btn.recording { background:#c7332a; animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%{transform:scale(1);}50%{transform:scale(1.08);}100%{transform:scale(1);} }
+
+  .fullscreen-btn { position:fixed; bottom:14px; right:14px; z-index:1200; background:#2a66c7; color:white; border:none; border-radius:50px; padding:10px 14px; display:none; }
+  @media (max-width:768px){ .fullscreen-btn{ display:block; } }
+  body.fullscreen #map { height:100vh !important; }
+  body.fullscreen .container, body.fullscreen .leaflet-control.custom-panel { display:none !important; }
+
+  /* tooltip mobile simple */
+  .tooltip-mobile { position:absolute; background:rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:6px; font-size:12px; z-index:2000; display:none; pointer-events:none; }
+</style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a66c7">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="MapyBibi">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="container" style="padding:10px;">
+  <div id="distance"></div>
+  <canvas id="elevationChart"></canvas>
+
+  <form id="formuploadajax" enctype="multipart/form-data" style="display:none;">
+    <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
+    <input type="hidden" name="type" value="hiking">
+    <input type="file" id="ibpFile" name="file" accept=".gpx" />
+  </form>
+  <div id="obtain"></div>
+</div>
+
+<div id="mobileTooltip" class="tooltip-mobile"></div>
+
+<script>
+/* --------------------- CONFIG --------------------- */
+const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0="; // <-- remplace par ta clé ORS
+const ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
+
+/* --------------------- CARTE --------------------- */
+const map = L.map('map').setView([46.8,2.2],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+/* --------------------- COUCHES / ETATS --------------------- */
+let markers = L.layerGroup().addTo(map);
+let routeLayer = L.layerGroup().addTo(map);       // tracé ORS multipoints
+let straightLineLayer = L.layerGroup().addTo(map); // couche dédiée pour A->B
+let manualPoints = [];           // format ORS: [ [lng,lat], ... ]
+let manualRouteCoords = [];      // final coords: [ [lat,lng,ele], ... ]
+
+let A = null, B = null;
+let markerA = null, markerB = null;
+let straightLine = null;
+
+const hikingTrailsLayer = L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{ maxZoom:18, opacity:0.9, attribution:"© Waymarked Trails / OSM" });
+let hikingVisible = false;
+
+/* --------------------- PANEL (icônes) --------------------- */
+const panel = L.control({ position: 'topright' });
+panel.onAdd = function(){
+  const div = L.DomUtil.create('div','leaflet-control custom-panel');
+  div.innerHTML = `
+    <input id="searchInput" placeholder="🔍 Rechercher un lieu">
+    <div class="icon-grid">
+      <button class="icon-btn" onclick="searchLocation()" title="Rechercher">🔍</button>
+      <button class="icon-btn" onclick="setPointA()" title="Point A">🅰️</button>
+      <button class="icon-btn" onclick="setPointB()" title="Point B">🅱️</button>
+      <button class="icon-btn" onclick="drawStraightLine()" title="Ligne A→B">📏</button>
+
+      <button class="icon-btn" onclick="computeRoute()" title="Tracer ORS A→B">🥾</button>
+
+      <button class="icon-btn secondary" onclick="removeLastPoint()" title="Annuler dernier point">↩️</button>
+      <button class="icon-btn secondary" onclick="clearAll()" title="Effacer tout">🗑️</button>
+
+      <button class="icon-btn" onclick="exportGPX()" title="Exporter GPX">💾</button>
+      <button class="icon-btn" onclick="exportGeoJSON()" title="Exporter GeoJSON">🧾</button>
+
+      <button class="icon-btn" onclick="toggleHikingTrails()" title="Afficher/masquer sentiers">🥾</button>
+
+      <button class="icon-btn" onclick="centerGPS()" title="Recentrer GPS">📍</button>
+      <button class="icon-btn" onclick="toggleNight()" title="Mode nuit">🌙</button>
+      <button class="icon-btn" onclick="toggleLock()" title="Verrouiller écran">🔒</button>
+      <button class="icon-btn" id="recBtn" onclick="toggleAutoRecording()" title="Enregistrement GPS">▶️</button>
+
+      <label style="grid-column:1 / -1; text-align:center; margin-top:4px;">
+        <input id="importFile" type="file" accept=".gpx,application/gpx+xml,application/json,application/geo+json" style="display:inline-block;">
+      </label>
+    </div>
+  `;
+  L.DomEvent.disableClickPropagation(div); // important : laisse les clics atteindre les boutons
+  return div;
+};
+panel.addTo(map);
+
+/* --------------------- GPS (pointeur rouge) --------------------- */
+let gpsMarker = null;
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(pos=>{
+    const latlng = [pos.coords.latitude, pos.coords.longitude];
+    const redIcon = L.icon({ iconUrl: "https://upload.wikimedia.org/wikipedia/commons/e/ec/RedDot.svg", iconSize:[14,14], iconAnchor:[7,7]});
+    if(!gpsMarker){
+      gpsMarker = L.marker(latlng,{icon:redIcon}).addTo(map);
+      map.setView(latlng, 12);
+    } else gpsMarker.setLatLng(latlng);
+  }, err=>console.warn("GPS:", err), { enableHighAccuracy:true });
+}
+
+/* --------------------- UTILITAIRES ELEVATION & DISTANCE --------------------- */
+function smoothArray(data, alpha=0.22){
+  if(!data.length) return data;
+  const out = new Array(data.length);
+  out[0] = data[0];
+  for(let i=1;i<data.length;i++) out[i] = out[i-1]*(1-alpha) + data[i]*alpha;
+  out[out.length-1] = data[data.length-1];
+  return out;
+}
+function computeElevationGain(elev){
+  let up=0, down=0;
+  for(let i=1;i<elev.length;i++){ const d = elev[i]-elev[i-1]; if(d>0) up+=d; else down+=Math.abs(d); }
+  return {positive:Math.round(up), negative:Math.round(down)};
+}
+function computeMinMax(elev){ if(!elev.length) return {min:0,max:0}; return {min:Math.round(Math.min(...elev)), max:Math.round(Math.max(...elev))}; }
+function computeTotalDistanceLatLngs(latlngs){ if(!latlngs.length) return 0; let tot=0; for(let i=1;i<latlngs.length;i++) tot+=L.latLng(latlngs[i-1][0],latlngs[i-1][1]).distanceTo(L.latLng(latlngs[i][0],latlngs[i][1])); return tot; }
+function computeCumulativeDistances(latlngs){ let arr=[0], tot=0; for(let i=1;i<latlngs.length;i++){ tot+=L.latLng(latlngs[i-1][0],latlngs[i-1][1]).distanceTo(L.latLng(latlngs[i][0],latlngs[i][1])); arr.push((tot/1000).toFixed(3)); } return arr; }
+
+/* --------------------- CHART PROFIL --------------------- */
+let elevationChart = null;
+function drawElevation(elevations, latlngs=[]){
+  const smooth = smoothArray(elevations.map(e=>Math.round(e||0)), 0.22);
+  const gain = computeElevationGain(smooth);
+  const mm = computeMinMax(smooth);
+  const cumulative = latlngs.length ? computeCumulativeDistances(latlngs) : smooth.map((_,i)=>i);
+
+  const ctx = document.getElementById('elevationChart').getContext('2d');
+  if(elevationChart) elevationChart.destroy();
+  elevationChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:cumulative, datasets:[{ label:'Altitude (m)', data:smooth, borderWidth:2, fill:false, tension:0.25, pointRadius:0 }]},
+    options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ title:{display:true,text:"Distance (km)"}}, y:{ title:{display:true,text:"Altitude (m)"} } } }
+  });
+
+  const totalDistance = latlngs.length ? (computeTotalDistanceLatLngs(latlngs)/1000).toFixed(2) : "0.00";
+  document.getElementById('distance').innerHTML = `📏 <b>Distance totale :</b> ${totalDistance} km<br>⬆️ <b>D+ :</b> ${gain.positive} m &nbsp; ⬇️ <b>D- :</b> ${gain.negative} m<br>🔻 <b>Min :</b> ${mm.min} m | 🔺 <b>Max :</b> ${mm.max} m`;
+}
+
+/* --------------------- UTIL: refresh markers --------------------- */
+function refreshMarkers(){
+  markers.clearLayers();
+  manualPoints.forEach((p, idx) => {
+    const m = L.marker([p[1], p[0]]).addTo(markers);
+    m.on('contextmenu', () => { manualPoints.splice(idx,1); rebuildManualRouteFromPoints(); refreshMarkers(); });
+  });
+}
+
+/* --------------------- REBUILD MULTIPOINTS (UN SEUL APPEL ORS) --------------------- */
+async function rebuildManualRouteFromPoints(){
+  // ne touche PAS straightLineLayer pour préserver A->B
+  routeLayer.clearLayers();
+  manualRouteCoords = [];
+
+  if(manualPoints.length < 2){ drawElevation([],[]); return; }
+
+  try {
+    const res = await fetch(ORS_URL, {
+      method: "POST",
+      headers: { "Authorization": ORS_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ coordinates: manualPoints, elevation:true, instructions:false, preference:"recommended" })
+    });
+
+    if(!res.ok) throw new Error("ORS HTTP " + res.status);
+    const data = await res.json();
+    if(!data.features || !data.features.length) throw new Error("ORS: pas de géométrie");
+
+    const coords = data.features[0].geometry.coordinates;
+    coords.forEach(c => { manualRouteCoords.push([c[1], c[0], c[2] || 0]); });
+
+    const latlngs = manualRouteCoords.map(c => [c[0], c[1]]);
+    L.polyline(latlngs, { color:"green", weight:4, smoothFactor:1.2 }).addTo(routeLayer);
+
+    drawElevation(manualRouteCoords.map(c=>c[2]||0), latlngs);
+    refreshMarkers();
+  } catch(err){
+    console.error("Erreur ORS multipoints:", err);
+    alert("Erreur ORS multipoints — vérifie la clé/connexion (voir console).");
+  }
+}
+
+/* --------------------- GESTION CLICS MAP POUR AJOUT POINTS --------------------- */
+map.on('click', e => {
+  // add clicked point to manualPoints as [lng,lat]
+  manualPoints.push([e.latlng.lng, e.latlng.lat]);
+  rebuildManualRouteFromPoints();
+});
+
+/* --------------------- A / B LIGNE DROITE (COUCHE SEPAREE) --------------------- */
+function setPointA(){
+  map.once('click', e => {
+    A = e.latlng;
+    if(markerA) straightLineLayer.removeLayer(markerA);
+    markerA = L.marker(A).addTo(straightLineLayer).bindPopup("A").openPopup();
+  });
+}
+function setPointB(){
+  map.once('click', e => {
+    B = e.latlng;
+    if(markerB) straightLineLayer.removeLayer(markerB);
+    markerB = L.marker(B).addTo(straightLineLayer).bindPopup("B").openPopup();
+  });
+}
+function drawStraightLine(){
+  if(!A || !B) return alert("Définissez A et B avant de tracer la ligne droite.");
+  if(straightLine) straightLineLayer.removeLayer(straightLine);
+  straightLine = L.polyline([[A.lat,A.lng],[B.lat,B.lng]], { color:"red", weight:3, dashArray:"6,6" }).addTo(straightLineLayer);
+
+  const dist = A.distanceTo(B)/1000;
+  const prev = document.getElementById('distance').innerHTML || "";
+  document.getElementById('distance').innerHTML = `📏 Ligne droite A→B : <b>${dist.toFixed(2)} km</b><br>` + prev;
+  map.fitBounds(L.latLngBounds([A,B]).pad(0.2));
+}
+
+/* --------------------- ORS ENTRE A ET B (OPTIONNEL) --------------------- */
+async function computeRoute(){
+  if(!A || !B) return alert("Définissez A et B pour calculer le tracé réel ORS entre eux.");
+  try {
+    const res = await fetch(ORS_URL, {
+      method:"POST",
+      headers: { "Authorization": ORS_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ coordinates: [[A.lng,A.lat],[B.lng,B.lat]], elevation:true, instructions:false })
+    });
+    if(!res.ok) throw new Error("ORS HTTP " + res.status);
+    const data = await res.json();
+    const coords = data.features[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+    const elev = data.features[0].geometry.coordinates.map(c=>c[2]||0);
+    L.polyline(coords, { color:"blue", weight:4 }).addTo(routeLayer);
+    map.fitBounds(coords);
+    drawElevation(elev, coords);
+  } catch(err){ console.error("Erreur computeRoute:", err); alert("Erreur ORS computeRoute."); }
+}
+
+/* --------------------- IMPORT / EXPORT --------------------- */
+document.getElementById('importFile').addEventListener('change', async (evt) => {
+  const file = evt.target.files[0];
+  if(!file) return;
+  const text = await file.text();
+  let geojson = null;
+  try {
+    if(file.name.toLowerCase().endsWith('.gpx')){
+      const xml = new DOMParser().parseFromString(text, "application/xml");
+      geojson = toGeoJSON.gpx(xml);
+    } else geojson = JSON.parse(text);
+  } catch(err){ return alert("Fichier invalide"); }
+
+  manualPoints = [];
+  manualRouteCoords = [];
+  routeLayer.clearLayers();
+  markers.clearLayers();
+
+  // extract LineString coords
+  let coords = [];
+  (geojson.features||[]).forEach(f => { if(f.geometry && f.geometry.type === "LineString") coords.push(...f.geometry.coordinates); });
+  if(!coords.length) return alert("Aucune trace trouvée");
+  coords.forEach(c => manualRouteCoords.push([c[1], c[0], c[2]||0]));
+  L.polyline(manualRouteCoords.map(c=>[c[0],c[1]]), { color:"green", weight:4 }).addTo(routeLayer);
+  drawElevation(manualRouteCoords.map(c=>c[2]||0), manualRouteCoords.map(c=>[c[0],c[1]]));
+  // create manualPoints from sample points (every Nth) so user can edit if needed
+  manualPoints = manualRouteCoords.map(c => [c[1], c[0]]);
+  refreshMarkers();
+  document.getElementById('distance').innerHTML += "<br>📂 Trace importée";
+});
+
+function exportGeoJSON(){
+  if(!manualRouteCoords.length) return alert("Aucune trace à exporter");
+  const geo = { type:"FeatureCollection", features:[{ type:"Feature", geometry:{ type:"LineString", coordinates: manualRouteCoords.map(c=>[c[1],c[0],c[2]||0]) }, properties:{} }]};
+  const blob = new Blob([JSON.stringify(geo)],{ type:"application/json" });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "trace.geojson"; a.click();
+}
+
+function exportGPX(){
+  if(manualRouteCoords.length < 2) return alert("Aucune trace complète à exporter");
+  const geo = { type:"FeatureCollection", features:[{ type:"Feature", geometry:{ type:"LineString", coordinates: manualRouteCoords.map(c=>[c[1],c[0],c[2]||0]) }, properties:{ name:"Trace complète ORS" } }]};
+  const gpx = togpx(geo);
+  const blob = new Blob([gpx], { type:"application/gpx+xml" });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "trace_complete.gpx"; a.click();
+
+  // inject into IBP form file input
+  try {
+    const file = new File([blob],"trace_complete.gpx",{ type:"application/gpx+xml" });
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('ibpFile').files = dt.files;
+    document.getElementById('formuploadajax').dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+    document.getElementById('obtain').innerHTML = "⏳ Calcul IBP en cours (GPX COMPLET envoyé)...";
+  } catch(err){ console.error("Erreur injection IBP:", err); }
+}
+
+/* --------------------- ANNULER / EFFACER --------------------- */
+function removeLastPoint(){ if(!manualPoints.length) return; manualPoints.pop(); rebuildManualRouteFromPoints(); refreshMarkers(); }
+function clearAll(){
+  manualPoints=[]; manualRouteCoords=[]; routeLayer.clearLayers(); markers.clearLayers(); if(markerA){ straightLineLayer.removeLayer(markerA); markerA=null; A=null; } if(markerB){ straightLineLayer.removeLayer(markerB); markerB=null; B=null; } if(straightLine){ straightLineLayer.removeLayer(straightLine); straightLine=null; } document.getElementById('distance').innerHTML=""; if(elevationChart) elevationChart.destroy();
+}
+
+/* --------------------- FORMULAIRE IBP AJAX --------------------- */
+$("#formuploadajax").on("submit", function(e){
+  e.preventDefault();
+  var formData = new FormData(this);
+  $.ajax({
+    url: "https://www.ibpindex.com/api/",
+    type: "post",
+    dataType: "json",
+    data: formData,
+    cache: false,
+    contentType: false,
+    processData: false
+  }).done(function(javascript_json){
+    let weobtain = `<h3>Résultat IBP HKG</h3><b>Référence :</b> ${javascript_json.reference}<br><b>Fichier :</b> ${javascript_json.filename}<br><br>🥾 <b>IBP Randonnée (HKG) :</b> <span style="font-size:22px;color:#2a66c7">${javascript_json.hiking.ibp}</span><br><br>⬆️ <b>Dénivelé cumulé :</b> ${javascript_json.hiking.accuclimb} m<br>⏱ <b>Temps arrêt :</b> ${javascript_json.hiking.totalstoptime} s`;
+    document.getElementById("obtain").innerHTML = weobtain;
+  }).fail(function(){ document.getElementById("obtain").innerHTML = "❌ Erreur lors du calcul IBP."; });
+});
+
+/* --------------------- SENTIERS ON/OFF --------------------- */
+function toggleHikingTrails(){ if(hikingVisible) map.removeLayer(hikingTrailsLayer); else hikingTrailsLayer.addTo(map); hikingVisible = !hikingVisible; }
+
+/* --------------------- RECHERCHE LIEU (Nominatim) --------------------- */
+async function searchLocation(){
+  const q = document.getElementById('searchInput').value.trim();
+  if(!q) return alert("Entrez un nom de lieu");
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
+  try{
+    const res = await fetch(url, { headers: { "Accept":"application/json", "User-Agent":"rando-app" }});
+    const data = await res.json();
+    if(!data.length) return alert("Lieu introuvable");
+    const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+    map.setView([lat,lon],14);
+    L.marker([lat,lon]).addTo(map).bindPopup(data[0].display_name).openPopup();
+  } catch(err){ console.error("searchLocation error:", err); alert("Erreur de recherche"); }
+}
+
+/* --------------------- ICÔNES AVANCEES: GPS / NIGHT / LOCK / REC --------------------- */
+function centerGPS(){ if(gpsMarker) map.setView(gpsMarker.getLatLng(),14); }
+function toggleNight(){ document.body.classList.toggle('night'); }
+function toggleLock(){ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(()=>{}); }
+
+let gpsTracking=false, recordedTrace=[];
+function toggleAutoRecording(){
+  gpsTracking = !gpsTracking;
+  const btn = document.getElementById('recBtn');
+  if(!btn) return;
+  if(gpsTracking){ recordedTrace=[]; btn.classList.add('recording'); btn.innerHTML='⏹️'; }
+  else { btn.classList.remove('recording'); btn.innerHTML='▶️'; if(recordedTrace.length>2){ manualRouteCoords = recordedTrace.map(p=>[p.lat,p.lng,p.ele||0]); routeLayer.clearLayers(); L.polyline(recordedTrace.map(p=>[p.lat,p.lng]),{color:"green",weight:4}).addTo(routeLayer); drawElevation(recordedTrace.map(p=>p.ele||0), recordedTrace.map(p=>[p.lat,p.lng])); } }
+}
+
+/* enregistrer positions GPS quand recording actif */
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(p=>{
+    if(gpsTracking) recordedTrace.push({ lat:p.coords.latitude, lng:p.coords.longitude, ele:p.coords.altitude||0 });
+  }, err=>{}, { enableHighAccuracy:true });
+}
+
+/* --------------------- PLEIN ECRAN MOBILE (bouton unique) --------------------- */
+const fsBtn = document.createElement('button');
+fsBtn.className = 'fullscreen-btn';
+fsBtn.id = 'fullscreenToggle';
+fsBtn.textContent = '📱 Plein écran';
+document.body.appendChild(fsBtn);
+
+fsBtn.addEventListener('click', () => {
+  document.body.classList.toggle('fullscreen');
+  fsBtn.innerHTML = document.body.classList.contains('fullscreen') ? '⬅️ Retour' : '📱 Plein écran';
+  setTimeout(()=> map.invalidateSize(), 300);
+});
+
+/* --------------------- petit helper pour debug console visible --------------------- */
+console.log("Traceur chargé. Vérifie la console pour erreurs (Ctrl+Shift+J).");
+
+/* --------------------- FIN --------------------- */
+</script>
+
+
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
