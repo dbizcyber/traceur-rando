@@ -1,11 +1,22 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-<meta charset="utf-8" />
-<title>Traceur randonnée — corrected</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a66c7">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<!-- iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Traceur Rando">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<head>
+<meta charset="utf-8">
+<title>Traceur randonnée val6.5.2 mobile - IBP - thunderforest</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
@@ -41,18 +52,14 @@
 
   /* tooltip mobile simple */
   .tooltip-mobile { position:absolute; background:rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:6px; font-size:12px; z-index:2000; display:none; pointer-events:none; }
+  /* zone saisie lieu modifiable */
+  .leaflet-control.custom-panel input {
+    pointer-events: auto !important;
+}
+
 </style>
 
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2a66c7">
 
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="MapyBibi">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-
-</head>
-<body>
 
 <div id="map"></div>
 
@@ -63,7 +70,7 @@
   <form id="formuploadajax" enctype="multipart/form-data" style="display:none;">
     <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
     <input type="hidden" name="type" value="hiking">
-    <input type="file" id="ibpFile" name="file" accept=".gpx" />
+    <input type="file" id="ibpFile" name="file" accept=".gpx">
   </form>
   <div id="obtain"></div>
 </div>
@@ -89,6 +96,16 @@ let manualRouteCoords = [];      // final coords: [ [lat,lng,ele], ... ]
 let A = null, B = null;
 let markerA = null, markerB = null;
 let straightLine = null;
+/* --- Thunderforest Outdoors --- */
+const thunderforestTrails = L.tileLayer(
+  "https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",
+  {
+    maxZoom: 22,
+    attribution: "Maps © Thunderforest, Data © OpenStreetMap contributors"
+  }
+);
+let thunderforestVisible = false;
+/* --- fin Thunderforest Outdoors --- */
 
 const hikingTrailsLayer = L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{ maxZoom:18, opacity:0.9, attribution:"© Waymarked Trails / OSM" });
 let hikingVisible = false;
@@ -119,13 +136,22 @@ panel.onAdd = function(){
       <button class="icon-btn" onclick="toggleNight()" title="Mode nuit">🌙</button>
       <button class="icon-btn" onclick="toggleLock()" title="Verrouiller écran">🔒</button>
       <button class="icon-btn" id="recBtn" onclick="toggleAutoRecording()" title="Enregistrement GPS">▶️</button>
+    <button class="icon-btn" onclick="toggleThunderforestTrails()" title="Sentiers Thunderforest">🌲</button>
+
 
       <label style="grid-column:1 / -1; text-align:center; margin-top:4px;">
         <input id="importFile" type="file" accept=".gpx,application/gpx+xml,application/json,application/geo+json" style="display:inline-block;">
       </label>
     </div>
   `;
+  /* --------------si saisie bloquée selon navigateurs mobile---------- */
   L.DomEvent.disableClickPropagation(div); // important : laisse les clics atteindre les boutons
+  // Autorise la saisie dans l'input de recherche
+const input = div.querySelector('#searchInput');
+L.DomEvent.disableClickPropagation(input);
+input.addEventListener('mousedown', e => e.stopPropagation());
+input.addEventListener('touchstart', e => e.stopPropagation());
+
   return div;
 };
 panel.addTo(map);
@@ -185,7 +211,14 @@ function drawElevation(elevations, latlngs=[]){
 function refreshMarkers(){
   markers.clearLayers();
   manualPoints.forEach((p, idx) => {
-    const m = L.marker([p[1], p[0]]).addTo(markers);
+    const m = L.circleMarker([p[1], p[0]], {
+    radius: 6,        // taille du cercle
+    color: "#0066ff", // bord
+    weight: 2,
+    fillColor: "#3399ff",
+    fillOpacity: 0.9
+}).addTo(markers);
+
     m.on('contextmenu', () => { manualPoints.splice(idx,1); rebuildManualRouteFromPoints(); refreshMarkers(); });
   });
 }
@@ -357,6 +390,17 @@ $("#formuploadajax").on("submit", function(e){
 /* --------------------- SENTIERS ON/OFF --------------------- */
 function toggleHikingTrails(){ if(hikingVisible) map.removeLayer(hikingTrailsLayer); else hikingTrailsLayer.addTo(map); hikingVisible = !hikingVisible; }
 
+/* --- Thunderforest ON/OFF --- */
+function toggleThunderforestTrails(){
+  if (thunderforestVisible) {
+    map.removeLayer(thunderforestTrails);
+  } else {
+    thunderforestTrails.addTo(map);
+  }
+  thunderforestVisible = !thunderforestVisible;
+}
+
+
 /* --------------------- RECHERCHE LIEU (Nominatim) --------------------- */
 async function searchLocation(){
   const q = document.getElementById('searchInput').value.trim();
@@ -413,11 +457,8 @@ console.log("Traceur chargé. Vérifie la console pour erreurs (Ctrl+Shift+J).")
 </script>
 
 
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
-}
-</script>
 
-</body>
-</html>
+
+
+
+
