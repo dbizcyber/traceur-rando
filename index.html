@@ -13,7 +13,7 @@
 
 <head>
 <meta charset="utf-8">
-<title>Traceur randonnée val6.5.2 mobile - IBP - thunderforest</title>
+<title>Traceur randonnée val6.5.3 mobile - IBP - thunderforest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
@@ -27,20 +27,30 @@
   body { margin:0; font-family: Arial, sans-serif; }
   #map { height: 65vh; }
 
-  .leaflet-control.custom-panel {
-    background: rgba(255,255,255,0.96);
+/* transparence du menu */
+.leaflet-control.custom-panel {
+    background: rgba(255,255,255,0.0); /* totalement transparent */
     padding: 8px;
     border-radius: 10px;
     width: 240px;
     max-width: 90vw;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  }
+}
+
 
   #distance { font-size: 14px; margin: 8px 0; }
   #elevationChart { height: 160px !important; }
 
   .icon-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-top:6px; }
   .icon-btn { width:36px; height:36px; border-radius:50%; border:none; background:#2a66c7; color:#fff; font-size:16px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.25); }
+  /* Force l’affichage en ligne horizontale */
+.icon-grid {
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 4px;
+}
+
   .icon-btn.secondary { background:#666; }
   .icon-btn.recording { background:#c7332a; animation:pulse 1.2s infinite; }
   @keyframes pulse { 0%{transform:scale(1);}50%{transform:scale(1.08);}100%{transform:scale(1);} }
@@ -56,6 +66,42 @@
   .leaflet-control.custom-panel input {
     pointer-events: auto !important;
 }
+/* Positionne le panneau en bas */
+.leaflet-bottom.leaflet-right {
+    bottom: 10px !important;
+    right: 10px !important;
+}
+
+/* Force votre panneau à se comporter comme une barre horizontale */
+.leaflet-control.custom-panel {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    background: rgba(255,255,255,0.0); /* transparent, selon votre demande précédente */
+    
+    box-shadow: none;
+    width: auto;
+    padding: 4px;
+}
+/* ------- MODE MOBILE : menu sur 2 lignes ------- */
+@media (max-width: 768px) {
+
+  .icon-grid {
+    flex-wrap: wrap !important;     /* permet 2 lignes */
+    justify-content: center;
+  }
+
+  .icon-btn {
+    flex: 0 0 calc(25% - 6px);      /* 4 icônes par ligne */
+  }
+
+  .leaflet-control.custom-panel {
+    width: 95vw;                    /* plus large sur mobile */
+    justify-content: center;
+  }
+}
+
 
 </style>
 
@@ -122,19 +168,13 @@ panel.onAdd = function(){
       <button class="icon-btn" onclick="setPointB()" title="Point B">🅱️</button>
       <button class="icon-btn" onclick="drawStraightLine()" title="Ligne A→B">📏</button>
 
-      <button class="icon-btn" onclick="computeRoute()" title="Tracer ORS A→B">🥾</button>
-
       <button class="icon-btn secondary" onclick="removeLastPoint()" title="Annuler dernier point">↩️</button>
       <button class="icon-btn secondary" onclick="clearAll()" title="Effacer tout">🗑️</button>
 
       <button class="icon-btn" onclick="exportGPX()" title="Exporter GPX">💾</button>
-      <button class="icon-btn" onclick="exportGeoJSON()" title="Exporter GeoJSON">🧾</button>
-
       <button class="icon-btn" onclick="toggleHikingTrails()" title="Afficher/masquer sentiers">🥾</button>
 
       <button class="icon-btn" onclick="centerGPS()" title="Recentrer GPS">📍</button>
-      <button class="icon-btn" onclick="toggleNight()" title="Mode nuit">🌙</button>
-      <button class="icon-btn" onclick="toggleLock()" title="Verrouiller écran">🔒</button>
       <button class="icon-btn" id="recBtn" onclick="toggleAutoRecording()" title="Enregistrement GPS">▶️</button>
     <button class="icon-btn" onclick="toggleThunderforestTrails()" title="Sentiers Thunderforest">🌲</button>
 
@@ -326,18 +366,47 @@ document.getElementById('importFile').addEventListener('change', async (evt) => 
   routeLayer.clearLayers();
   markers.clearLayers();
 
-  // extract LineString coords
-  let coords = [];
-  (geojson.features||[]).forEach(f => { if(f.geometry && f.geometry.type === "LineString") coords.push(...f.geometry.coordinates); });
-  if(!coords.length) return alert("Aucune trace trouvée");
-  coords.forEach(c => manualRouteCoords.push([c[1], c[0], c[2]||0]));
-  L.polyline(manualRouteCoords.map(c=>[c[0],c[1]]), { color:"green", weight:4 }).addTo(routeLayer);
-  drawElevation(manualRouteCoords.map(c=>c[2]||0), manualRouteCoords.map(c=>[c[0],c[1]]));
-  // create manualPoints from sample points (every Nth) so user can edit if needed
-  manualPoints = manualRouteCoords.map(c => [c[1], c[0]]);
-  refreshMarkers();
-  document.getElementById('distance').innerHTML += "<br>📂 Trace importée";
+// extraction compatible LineString / MultiLineString / segments multiples
+let coords = [];
+
+(geojson.features || []).forEach(f => {
+    if (!f.geometry) return;
+
+    // cas simple : LineString
+    if (f.geometry.type === "LineString") {
+        coords.push(...f.geometry.coordinates);
+    }
+
+    // cas fréquent dans les GPX réels : MultiLineString (segments multiples)
+    if (f.geometry.type === "MultiLineString") {
+        f.geometry.coordinates.forEach(seg => coords.push(...seg));
+    }
 });
+
+if (!coords.length) {
+    return alert("Aucune trace exploitable trouvée dans ce fichier GPX");
+}
+
+
+  coords.forEach(c => manualRouteCoords.push([c[1], c[0], c[2]||0]));
+  L.polyline(manualRouteCoords.map(c=>[c[0],c[1]]), { color:"red", weight:2 }).addTo(routeLayer);
+
+  // centrage automatique sur la trace importée
+const bounds = manualRouteCoords.map(c => [c[0], c[1]]);
+map.fitBounds(bounds, { padding: [20, 20] });
+
+  drawElevation(manualRouteCoords.map(c=>c[2]||0), manualRouteCoords.map(c=>[c[0],c[1]]));
+  
+  // create manualPoints from sample points (every Nth) so user can edit if needed
+  // manualPoints = manualRouteCoords.map(c => [c[1], c[0]]);
+  // refreshMarkers();
+  manualPoints = [];  // aucune création de points
+
+  document.getElementById('distance').innerHTML += "<br>📂 Trace importée";
+
+});
+
+
 
 function exportGeoJSON(){
   if(!manualRouteCoords.length) return alert("Aucune trace à exporter");
