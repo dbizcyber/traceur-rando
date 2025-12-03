@@ -13,7 +13,7 @@
 
 <head>
 <meta charset="utf-8">
-<title>Traceur randonnée val6.5.3 mobile - IBP - thunderforest</title>
+<title>Traceur randonnée val6.5.2 -> 6.6 mobile - IBP - thunderforest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
@@ -24,108 +24,223 @@
 <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
 
 <style>
-  body { margin:0; font-family: Arial, sans-serif; }
-  #map { height: 65vh; }
+  /* ===== Base ===== */
+  body { margin:0; font-family: Arial, sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  #map { height: 100vh; }
 
-/* transparence du menu */
-.leaflet-control.custom-panel {
-    background: rgba(255,255,255,0.0); /* totalement transparent */
-    padding: 8px;
-    border-radius: 10px;
-    width: 240px;
-    max-width: 90vw;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+body {
+  overflow: hidden;
 }
 
 
   #distance { font-size: 14px; margin: 8px 0; }
   #elevationChart { height: 160px !important; }
 
-  .icon-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-top:6px; }
-  .icon-btn { width:36px; height:36px; border-radius:50%; border:none; background:#2a66c7; color:#fff; font-size:16px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.25); }
-  /* Force l’affichage en ligne horizontale */
-.icon-grid {
-    display: flex !important;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 4px;
-}
-
-  .icon-btn.secondary { background:#666; }
-  .icon-btn.recording { background:#c7332a; animation:pulse 1.2s infinite; }
-  @keyframes pulse { 0%{transform:scale(1);}50%{transform:scale(1.08);}100%{transform:scale(1);} }
-
-  .fullscreen-btn { position:fixed; bottom:14px; right:14px; z-index:1200; background:#2a66c7; color:white; border:none; border-radius:50px; padding:10px 14px; display:none; }
-  @media (max-width:768px){ .fullscreen-btn{ display:block; } }
-  body.fullscreen #map { height:100vh !important; }
-  body.fullscreen .container, body.fullscreen .leaflet-control.custom-panel { display:none !important; }
-
-  /* tooltip mobile simple */
-  .tooltip-mobile { position:absolute; background:rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:6px; font-size:12px; z-index:2000; display:none; pointer-events:none; }
-  /* zone saisie lieu modifiable */
-  .leaflet-control.custom-panel input {
-    pointer-events: auto !important;
-}
-/* Positionne le panneau en bas */
-.leaflet-bottom.leaflet-right {
-    bottom: 10px !important;
-    right: 10px !important;
-}
-
-/* Force votre panneau à se comporter comme une barre horizontale */
-.leaflet-control.custom-panel {
+  /* ===== TOP BAR (Recherche + Import) ===== */
+  .top-bar {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    background: rgba(255,255,255,0.0); /* transparent, selon votre demande précédente */
-    
-    box-shadow: none;
+    gap: 8px;
+    z-index: 1400;
+    background: rgba(0,0,0,0);
+    padding: 6px 10px;
+    border-radius: 20px;
+    pointer-events: auto;
+  }
+  .top-bar * { pointer-events: auto; } /* assure l'interaction sur mobile */
+
+  .top-bar input[type="text"],
+  .top-bar input[type="search"],
+  .top-bar input[type="file"] {
+    background: rgba(255,255,255,0.95);
+    border: none;
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 14px;
+    outline: none;
+    height: 34px;
+  }
+  .top-bar input[type="text"],
+  .top-bar input[type="search"] {
+    width: 160px;
+  }
+  .top-bar input[type="file"] {
+    width: 120px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  @media (max-width:420px) {
+    .top-bar input[type="text"]{ width: 120px; }
+  }
+
+  /* ===== DOCK GPS FLOTTANT (unique, propre) ===== */
+  .leaflet-control.custom-panel {
+    position: fixed !important;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
     width: auto;
-    padding: 4px;
-}
-/* ------- MODE MOBILE : menu sur 2 lignes ------- */
-@media (max-width: 768px) {
+    z-index: 1500;
+    pointer-events: auto;   /* important : doit accepter les clics */
+  }
 
   .icon-grid {
-    flex-wrap: wrap !important;     /* permet 2 lignes */
-    justify-content: center;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    pointer-events: auto;
+    padding: 6px;
+    background: rgba(0,0,0,0.10);
+    border-radius: 28px;
   }
 
   .icon-btn {
-    flex: 0 0 calc(25% - 6px);      /* 4 icônes par ligne */
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.35);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.30);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
   }
 
-  .leaflet-control.custom-panel {
-    width: 95vw;                    /* plus large sur mobile */
-    justify-content: center;
+  .icon-btn.secondary { background: rgba(0,0,0,0.22); }
+  .icon-btn.recording { background: rgba(180,0,0,0.6); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%{transform:scale(1);}50%{transform:scale(1.08);}100%{transform:scale(1);} }
+
+  .icon-btn:active { transform: scale(0.92); }
+
+  /* ===== BOUTON PLEIN ECRAN (non superposé au dock) ===== */
+  .fullscreen-btn {
+    position: fixed;
+    bottom: 78px;   /* remonte au-dessus du dock */
+    right: 10px;
+    z-index: 1600;
+    background: rgba(0,0,0,0.35);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    padding: 8px 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    cursor: pointer;
   }
+  @media (max-width:768px){ .fullscreen-btn{ display:block; } }
+
+  /* ===== FULLSCREEN MODE ===== */
+  body.fullscreen #map { height: 100vh !important; }
+  /* masquer seulement la zone container (infos/profil) mais laisser le dock et la top-bar visibles */
+  body.fullscreen .container { display: none !important; }
+
+  /* ===== TOOLTIP MOBILE ===== */
+  .tooltip-mobile {
+    position:absolute;
+    background:rgba(0,0,0,0.85);
+    color:#fff;
+    padding:6px 8px;
+    border-radius:6px;
+    font-size:12px;
+    z-index:2000;
+    display:none;
+    pointer-events:none;
+  }
+
+  /* petit ajustement responsive */
+  @media (max-width:420px){
+    .icon-btn{ width:30px; height:30px; font-size:14px; }
+    .top-bar { top: 8px; padding: 6px 8px; }
+  }
+/* ===== PANNEAU INFOS (ÉLÉVATION + IBP) ===== */
+
+.container {
+  position: fixed;
+  bottom: -260px;          /* caché par défaut */
+  left: 0;
+  width: 100%;
+  height: 260px;
+  background: #111;
+  color: white;
+  z-index: 1400;
+  transition: bottom 0.3s ease;
+  overflow-y: auto;
+  padding: 10px;
 }
 
+/* quand ouvert */
+.container.open {
+  bottom: 0;
+}
+
+/* bouton d’ouverture */
+.info-toggle {
+  position: fixed;
+  bottom: 60px;
+  left: 10px;
+  z-index: 1500;
+  background: #2a66c7;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
 
 </style>
+</head>
+<body>
+
+  <!-- Carte -->
+  <div id="map"></div>
+  <button class="info-toggle" onclick="toggleInfoPanel()">
+  📊 Infos
+</button>
 
 
+  <!-- Barre du haut : recherche + import (hors panel Leaflet) -->
+  <div class="top-bar" role="region" aria-label="recherche et import gpx">
+    <input id="searchInput" type="search" placeholder="🔍 Rechercher un lieu" aria-label="Rechercher un lieu">
+    <input id="importFile" type="file" accept=".gpx,application/gpx+xml,application/json,application/geo+json" aria-label="Importer GPX">
+  </div>
 
-<div id="map"></div>
+  <!-- Infos / profil / résultat -->
+  <div class="container" style="padding:10px;">
+    <div id="distance"></div>
+    <canvas id="elevationChart"></canvas>
 
-<div class="container" style="padding:10px;">
-  <div id="distance"></div>
-  <canvas id="elevationChart"></canvas>
+    <form id="formuploadajax" enctype="multipart/form-data" style="display:none;">
+      <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
+      <input type="hidden" name="type" value="hiking">
+      <input type="file" id="ibpFile" name="file" accept=".gpx">
+    </form>
+    <div id="obtain"></div>
+  </div>
 
-  <form id="formuploadajax" enctype="multipart/form-data" style="display:none;">
-    <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
-    <input type="hidden" name="type" value="hiking">
-    <input type="file" id="ibpFile" name="file" accept=".gpx">
-  </form>
-  <div id="obtain"></div>
-</div>
+  <div id="mobileTooltip" class="tooltip-mobile"></div>
 
-<div id="mobileTooltip" class="tooltip-mobile"></div>
+  <!-- Bouton plein écran (supprimé) -->
+
 
 <script>
 /* --------------------- CONFIG --------------------- */
-const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0="; // <-- remplace par ta clé ORS
+const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0=";
 const ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
 
 /* --------------------- CARTE --------------------- */
@@ -134,35 +249,30 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 /* --------------------- COUCHES / ETATS --------------------- */
 let markers = L.layerGroup().addTo(map);
-let routeLayer = L.layerGroup().addTo(map);       // tracé ORS multipoints
-let straightLineLayer = L.layerGroup().addTo(map); // couche dédiée pour A->B
-let manualPoints = [];           // format ORS: [ [lng,lat], ... ]
-let manualRouteCoords = [];      // final coords: [ [lat,lng,ele], ... ]
+let routeLayer = L.layerGroup().addTo(map);
+let straightLineLayer = L.layerGroup().addTo(map);
+let manualPoints = [];
+let manualRouteCoords = [];
 
 let A = null, B = null;
 let markerA = null, markerB = null;
 let straightLine = null;
-/* --- Thunderforest Outdoors --- */
+
 const thunderforestTrails = L.tileLayer(
   "https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",
-  {
-    maxZoom: 22,
-    attribution: "Maps © Thunderforest, Data © OpenStreetMap contributors"
-  }
+  { maxZoom: 22, attribution: "Maps © Thunderforest, Data © OpenStreetMap contributors" }
 );
 let thunderforestVisible = false;
-/* --- fin Thunderforest Outdoors --- */
 
 const hikingTrailsLayer = L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{ maxZoom:18, opacity:0.9, attribution:"© Waymarked Trails / OSM" });
 let hikingVisible = false;
 
-/* --------------------- PANEL (icônes) --------------------- */
-const panel = L.control({ position: 'topright' });
+/* --------------------- PANEL (icônes) - position cohérente bottomleft --------------------- */
+const panel = L.control({ position: 'bottomleft' });
 panel.onAdd = function(){
   const div = L.DomUtil.create('div','leaflet-control custom-panel');
   div.innerHTML = `
-    <input id="searchInput" placeholder="🔍 Rechercher un lieu">
-    <div class="icon-grid">
+    <div class="icon-grid" role="toolbar" aria-label="menu actions">
       <button class="icon-btn" onclick="searchLocation()" title="Rechercher">🔍</button>
       <button class="icon-btn" onclick="setPointA()" title="Point A">🅰️</button>
       <button class="icon-btn" onclick="setPointB()" title="Point B">🅱️</button>
@@ -176,22 +286,11 @@ panel.onAdd = function(){
 
       <button class="icon-btn" onclick="centerGPS()" title="Recentrer GPS">📍</button>
       <button class="icon-btn" id="recBtn" onclick="toggleAutoRecording()" title="Enregistrement GPS">▶️</button>
-    <button class="icon-btn" onclick="toggleThunderforestTrails()" title="Sentiers Thunderforest">🌲</button>
-
-
-      <label style="grid-column:1 / -1; text-align:center; margin-top:4px;">
-        <input id="importFile" type="file" accept=".gpx,application/gpx+xml,application/json,application/geo+json" style="display:inline-block;">
-      </label>
+      <button class="icon-btn" onclick="toggleThunderforestTrails()" title="Sentiers Thunderforest">🌲</button>
     </div>
   `;
-  /* --------------si saisie bloquée selon navigateurs mobile---------- */
-  L.DomEvent.disableClickPropagation(div); // important : laisse les clics atteindre les boutons
-  // Autorise la saisie dans l'input de recherche
-const input = div.querySelector('#searchInput');
-L.DomEvent.disableClickPropagation(input);
-input.addEventListener('mousedown', e => e.stopPropagation());
-input.addEventListener('touchstart', e => e.stopPropagation());
-
+  // laisser la possibilité d'interagir sur les inputs extérieurs si présents
+  L.DomEvent.disableClickPropagation(div);
   return div;
 };
 panel.addTo(map);
@@ -247,25 +346,8 @@ function drawElevation(elevations, latlngs=[]){
   document.getElementById('distance').innerHTML = `📏 <b>Distance totale :</b> ${totalDistance} km<br>⬆️ <b>D+ :</b> ${gain.positive} m &nbsp; ⬇️ <b>D- :</b> ${gain.negative} m<br>🔻 <b>Min :</b> ${mm.min} m | 🔺 <b>Max :</b> ${mm.max} m`;
 }
 
-/* --------------------- UTIL: refresh markers --------------------- */
-function refreshMarkers(){
-  markers.clearLayers();
-  manualPoints.forEach((p, idx) => {
-    const m = L.circleMarker([p[1], p[0]], {
-    radius: 6,        // taille du cercle
-    color: "#0066ff", // bord
-    weight: 2,
-    fillColor: "#3399ff",
-    fillOpacity: 0.9
-}).addTo(markers);
-
-    m.on('contextmenu', () => { manualPoints.splice(idx,1); rebuildManualRouteFromPoints(); refreshMarkers(); });
-  });
-}
-
 /* --------------------- REBUILD MULTIPOINTS (UN SEUL APPEL ORS) --------------------- */
 async function rebuildManualRouteFromPoints(){
-  // ne touche PAS straightLineLayer pour préserver A->B
   routeLayer.clearLayers();
   manualRouteCoords = [];
 
@@ -298,12 +380,11 @@ async function rebuildManualRouteFromPoints(){
 
 /* --------------------- GESTION CLICS MAP POUR AJOUT POINTS --------------------- */
 map.on('click', e => {
-  // add clicked point to manualPoints as [lng,lat]
   manualPoints.push([e.latlng.lng, e.latlng.lat]);
   rebuildManualRouteFromPoints();
 });
 
-/* --------------------- A / B LIGNE DROITE (COUCHE SEPAREE) --------------------- */
+/* --------------------- A / B LIGNE DROITE --------------------- */
 function setPointA(){
   map.once('click', e => {
     A = e.latlng;
@@ -366,48 +447,30 @@ document.getElementById('importFile').addEventListener('change', async (evt) => 
   routeLayer.clearLayers();
   markers.clearLayers();
 
-// extraction compatible LineString / MultiLineString / segments multiples
-let coords = [];
+  let coords = [];
+  (geojson.features || []).forEach(f => {
+      if (!f.geometry) return;
+      if (f.geometry.type === "LineString") coords.push(...f.geometry.coordinates);
+      if (f.geometry.type === "MultiLineString") f.geometry.coordinates.forEach(seg => coords.push(...seg));
+  });
 
-(geojson.features || []).forEach(f => {
-    if (!f.geometry) return;
-
-    // cas simple : LineString
-    if (f.geometry.type === "LineString") {
-        coords.push(...f.geometry.coordinates);
-    }
-
-    // cas fréquent dans les GPX réels : MultiLineString (segments multiples)
-    if (f.geometry.type === "MultiLineString") {
-        f.geometry.coordinates.forEach(seg => coords.push(...seg));
-    }
-});
-
-if (!coords.length) {
-    return alert("Aucune trace exploitable trouvée dans ce fichier GPX");
-}
-
+  if (!coords.length) {
+      return alert("Aucune trace exploitable trouvée dans ce fichier GPX");
+  }
 
   coords.forEach(c => manualRouteCoords.push([c[1], c[0], c[2]||0]));
   L.polyline(manualRouteCoords.map(c=>[c[0],c[1]]), { color:"red", weight:2 }).addTo(routeLayer);
 
-  // centrage automatique sur la trace importée
-const bounds = manualRouteCoords.map(c => [c[0], c[1]]);
-map.fitBounds(bounds, { padding: [20, 20] });
+  const bounds = manualRouteCoords.map(c => [c[0], c[1]]);
+  map.fitBounds(bounds, { padding: [20, 20] });
 
   drawElevation(manualRouteCoords.map(c=>c[2]||0), manualRouteCoords.map(c=>[c[0],c[1]]));
-  
-  // create manualPoints from sample points (every Nth) so user can edit if needed
-  // manualPoints = manualRouteCoords.map(c => [c[1], c[0]]);
-  // refreshMarkers();
-  manualPoints = [];  // aucune création de points
+  manualPoints = [];
 
   document.getElementById('distance').innerHTML += "<br>📂 Trace importée";
-
 });
 
-
-
+/* export */
 function exportGeoJSON(){
   if(!manualRouteCoords.length) return alert("Aucune trace à exporter");
   const geo = { type:"FeatureCollection", features:[{ type:"Feature", geometry:{ type:"LineString", coordinates: manualRouteCoords.map(c=>[c[1],c[0],c[2]||0]) }, properties:{} }]};
@@ -422,7 +485,6 @@ function exportGPX(){
   const blob = new Blob([gpx], { type:"application/gpx+xml" });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "trace_complete.gpx"; a.click();
 
-  // inject into IBP form file input
   try {
     const file = new File([blob],"trace_complete.gpx",{ type:"application/gpx+xml" });
     const dt = new DataTransfer(); dt.items.add(file);
@@ -433,9 +495,21 @@ function exportGPX(){
 }
 
 /* --------------------- ANNULER / EFFACER --------------------- */
+function refreshMarkers(){
+  markers.clearLayers();
+  manualPoints.forEach((p, idx) => {
+    const m = L.circleMarker([p[1], p[0]], { radius: 6, color: "#0066ff", weight: 2, fillColor: "#3399ff", fillOpacity: 0.9 }).addTo(markers);
+    m.on('contextmenu', () => { manualPoints.splice(idx,1); rebuildManualRouteFromPoints(); refreshMarkers(); });
+  });
+}
 function removeLastPoint(){ if(!manualPoints.length) return; manualPoints.pop(); rebuildManualRouteFromPoints(); refreshMarkers(); }
 function clearAll(){
-  manualPoints=[]; manualRouteCoords=[]; routeLayer.clearLayers(); markers.clearLayers(); if(markerA){ straightLineLayer.removeLayer(markerA); markerA=null; A=null; } if(markerB){ straightLineLayer.removeLayer(markerB); markerB=null; B=null; } if(straightLine){ straightLineLayer.removeLayer(straightLine); straightLine=null; } document.getElementById('distance').innerHTML=""; if(elevationChart) elevationChart.destroy();
+  manualPoints=[]; manualRouteCoords=[]; routeLayer.clearLayers(); markers.clearLayers();
+  if(markerA){ straightLineLayer.removeLayer(markerA); markerA=null; A=null; }
+  if(markerB){ straightLineLayer.removeLayer(markerB); markerB=null; B=null; }
+  if(straightLine){ straightLineLayer.removeLayer(straightLine); straightLine=null; }
+  document.getElementById('distance').innerHTML="";
+  if(elevationChart) elevationChart.destroy();
 }
 
 /* --------------------- FORMULAIRE IBP AJAX --------------------- */
@@ -458,17 +532,10 @@ $("#formuploadajax").on("submit", function(e){
 
 /* --------------------- SENTIERS ON/OFF --------------------- */
 function toggleHikingTrails(){ if(hikingVisible) map.removeLayer(hikingTrailsLayer); else hikingTrailsLayer.addTo(map); hikingVisible = !hikingVisible; }
-
-/* --- Thunderforest ON/OFF --- */
 function toggleThunderforestTrails(){
-  if (thunderforestVisible) {
-    map.removeLayer(thunderforestTrails);
-  } else {
-    thunderforestTrails.addTo(map);
-  }
+  if (thunderforestVisible) map.removeLayer(thunderforestTrails); else thunderforestTrails.addTo(map);
   thunderforestVisible = !thunderforestVisible;
 }
-
 
 /* --------------------- RECHERCHE LIEU (Nominatim) --------------------- */
 async function searchLocation(){
@@ -485,10 +552,8 @@ async function searchLocation(){
   } catch(err){ console.error("searchLocation error:", err); alert("Erreur de recherche"); }
 }
 
-/* --------------------- ICÔNES AVANCEES: GPS / NIGHT / LOCK / REC --------------------- */
+/* --------------------- ICÔNES AVANCEES: GPS / REC --------------------- */
 function centerGPS(){ if(gpsMarker) map.setView(gpsMarker.getLatLng(),14); }
-function toggleNight(){ document.body.classList.toggle('night'); }
-function toggleLock(){ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(()=>{}); }
 
 let gpsTracking=false, recordedTrace=[];
 function toggleAutoRecording(){
@@ -506,28 +571,26 @@ if(navigator.geolocation){
   }, err=>{}, { enableHighAccuracy:true });
 }
 
-/* --------------------- PLEIN ECRAN MOBILE (bouton unique) --------------------- */
-const fsBtn = document.createElement('button');
-fsBtn.className = 'fullscreen-btn';
-fsBtn.id = 'fullscreenToggle';
-fsBtn.textContent = '📱 Plein écran';
-document.body.appendChild(fsBtn);
+/* --------------------- PLEIN ECRAN MOBILE (bouton supprimé DOM) --------------------- */
 
-fsBtn.addEventListener('click', () => {
-  document.body.classList.toggle('fullscreen');
-  fsBtn.innerHTML = document.body.classList.contains('fullscreen') ? '⬅️ Retour' : '📱 Plein écran';
-  setTimeout(()=> map.invalidateSize(), 300);
-});
-
-/* --------------------- petit helper pour debug console visible --------------------- */
-console.log("Traceur chargé. Vérifie la console pour erreurs (Ctrl+Shift+J).");
+/* --------------------- PROTECTION: si on avait tenté de désactiver la saisie dans un panel (ancien code) */
+(function(){
+  // autorise la saisie dans le champ recherche (certaines anciennes versions tentaient de l'interdire)
+  const input = document.getElementById('searchInput');
+  if(input){
+    input.addEventListener('mousedown', e => e.stopPropagation());
+    input.addEventListener('touchstart', e => e.stopPropagation());
+  }
+})();
 
 /* --------------------- FIN --------------------- */
+console.log("Traceur chargé. Dock + top-bar actifs.");
+function toggleInfoPanel(){
+  const panel = document.querySelector('.container');
+  panel.classList.toggle('open');
+}
+
 </script>
 
-
-
-
-
-
-
+</body>
+</html>
