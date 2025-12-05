@@ -12,9 +12,11 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 <head>
-
-  <meta charset="utf-8">
-<title>Traceur randonnée val6.5.2 -> 6.6 mobile - IBP - thunderforest</title>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Traceur randonnée 6.6.2 mobile - IBP - thunderforest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
@@ -30,8 +32,10 @@
   #map { height: 100vh; }
 
 body {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
+
 
 
   #distance { font-size: 14px; margin: 8px 0; }
@@ -79,89 +83,72 @@ body {
   }
 
   /* ===== DOCK GPS FLOTTANT (unique, propre) ===== */
-  /* ===== DOCK GPS FLOTTANT (unique, propre) ===== */
-.leaflet-control.custom-panel {
-  position: fixed !important;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: center;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0;
-  width: auto;
-  z-index: 1500;
-  pointer-events: auto;
-}
+  .leaflet-control.custom-panel {
+    position: fixed !important;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
+    width: auto;
+    z-index: 1500;
+    pointer-events: auto;   /* important : doit accepter les clics */
+  }
 
-/* Conteneur d'icônes : plus fluide et responsive.
-   On retire le fond gris, on autorise le retour à la ligne
-   et on limite la largeur pour éviter le débordement. */
-.icon-grid {
-  display: flex;
-  flex-wrap: wrap;               /* permet de passer à la ligne si l'espace manque */
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  padding: 6px;
-  background: transparent;       /* suppression du fond gris */
-  border-radius: 28px;
-  max-width: 94vw;               /* ne dépasse jamais l'écran (quelques px de marge) */
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-  overflow: hidden;              /* évite les débordements visuels */
-}
+  .icon-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    pointer-events: auto;
+    padding: 6px;
+    background: rgba(0,0,0,0.10);
+    border-radius: 28px;
+  }
 
-/* Boutons : tailles fluides avec clamp pour rester lisibles,
-   taille minimale/ max contrôlées ; suppression des gros fonds opaques. */
-.icon-btn {
-  width: clamp(30px, 8vw, 44px);   /* min 30px, max 44px, s'adapte selon l'écran */
-  height: clamp(30px, 8vw, 44px);
-  border-radius: 50%;
-  border: none;
-  background: rgba(0,0,0,0.18);    /* si vous voulez totalement transparent => transparent */
-  color: #fff;
-  font-size: clamp(14px, 4.2vw, 18px);
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex: 0 0 auto;                  /* empêche les boutons d'étirer leur largeur */
-  min-width: 0;
-}
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.35);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.30);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
 
-/* variantes */
-.icon-btn.secondary { background: rgba(0,0,0,0.12); }
-.icon-btn.recording { background: rgba(180,0,0,0.65); animation: pulse 1.2s infinite; }
+  .icon-btn.secondary { background: rgba(0,0,0,0.22); }
+  .icon-btn.recording { background: rgba(180,0,0,0.6); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%{transform:scale(1);}50%{transform:scale(1.08);}100%{transform:scale(1);} }
 
-.icon-btn:active { transform: scale(0.92); }
+  .icon-btn:active { transform: scale(0.92); }
 
-/* ajustements pour très petits écrans : réduire gaps et padding */
-@media (max-width:420px){
-  .icon-grid { gap: 6px; padding: 4px; max-width: 98vw; }
-  .icon-btn { width: clamp(28px, 9vw, 40px); height: clamp(28px, 9vw, 40px); font-size: clamp(13px, 4.8vw, 16px); }
-  .top-bar { top: 8px; padding: 6px 8px; }
-}
-
-/* si vous préférez un défilement horizontal au lieu du wrap sur téléphones,
-   remplacez .icon-grid rules par ces options (décommentez et testez si vous préférez) :
-
-.icon-grid {
-  display:flex;
-  gap:8px;
-  overflow-x:auto;
-  white-space:nowrap;
-  -webkit-overflow-scrolling:touch;
-  padding:6px;
-  background:transparent;
-}
-*/
-
+  /* ===== BOUTON PLEIN ECRAN (non superposé au dock) ===== */
+  .fullscreen-btn {
+    position: fixed;
+    bottom: 78px;   /* remonte au-dessus du dock */
+    right: 10px;
+    z-index: 1600;
+    background: rgba(0,0,0,0.35);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    padding: 8px 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    cursor: pointer;
+  }
+  @media (max-width:768px){ .fullscreen-btn{ display:block; } }
 
   /* ===== FULLSCREEN MODE ===== */
   body.fullscreen #map { height: 100vh !important; }
@@ -220,8 +207,76 @@ body {
   padding: 8px 14px;
   font-size: 14px;
 }
+/* ============================
+   ✅ CORRECTION AFFICHAGE MOBILE
+   ============================ */
+
+@media (max-width: 480px) {
+
+  /* --- BARRE DU HAUT PLUS COMPACTE --- */
+  .top-bar {
+    top: 4px;
+    gap: 6px;
+    padding: 4px 6px;
+  }
+
+  .top-bar input[type="text"],
+  .top-bar input[type="search"] {
+    width: 110px;
+    font-size: 12px;
+    height: 28px;
+  }
+
+  .top-bar input[type="file"] {
+    width: 90px;
+    font-size: 11px;
+    height: 28px;
+  }
+
+  /* --- DOCK DU BAS PLUS BAS ET PLUS PETIT --- */
+  .leaflet-control.custom-panel {
+    bottom: 6px;
+  }
+
+  .icon-grid {
+    gap: 6px;
+    padding: 5px 6px;
+  }
+
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  /* --- BOUTON INFOS REMONTÉ --- */
+  .info-toggle {
+    bottom: 100px;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  /* --- PANNEAU INFOS RÉDUIT --- */
+  .container {
+    height: 200px;
+    bottom: -200px;
+    font-size: 13px;
+  }
+
+  .container.open {
+    bottom: 0;
+  }
+
+  #elevationChart {
+    height: 120px !important;
+  }
+
+  #distance {
+    font-size: 12px;
+  }
+}
 .leaflet-container {
-  touch-action: pan-x pan-y !important;
+  touch-action: pan-x pan-y;
 }
 
 </style>
@@ -303,11 +358,8 @@ panel.onAdd = function(){
       <button class="icon-btn secondary" onclick="clearAll()" title="Effacer tout">🗑️</button>
 
       <button class="icon-btn" onclick="exportGPX()" title="Exporter GPX">💾</button>
-      <button class="icon-btn" onclick="toggleHikingTrails()" title="Afficher/masquer sentiers">🥾</button>
-
       <button class="icon-btn" onclick="centerGPS()" title="Recentrer GPS">📍</button>
       <button class="icon-btn" id="recBtn" onclick="toggleAutoRecording()" title="Enregistrement GPS">▶️</button>
-      <button class="icon-btn" onclick="toggleThunderforestTrails()" title="Sentiers Thunderforest">🌲</button>
     </div>
   `;
   // laisser la possibilité d'interagir sur les inputs extérieurs si présents
@@ -315,6 +367,20 @@ panel.onAdd = function(){
   return div;
 };
 panel.addTo(map);
+
+/* --------------------- COUCHES - CONTROL (HAUT DROITE) --------------------- */
+/* baseLayers & overlays pour contrôle (position topright, collapsed pour mobile) */
+const baseLayers = {
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+  "Thunderforest Outdoors": thunderforestTrails
+};
+const overlays = {
+  "Sentiers hiking (Waymarked Trails)": hikingTrailsLayer,
+  "Points manuels": markers,
+  "Ligne droite A→B": straightLineLayer,
+  "Trace ORS": routeLayer
+};
+L.control.layers(baseLayers, overlays, { collapsed: true, position: "topright" }).addTo(map);
 
 /* --------------------- GPS (pointeur rouge) --------------------- */
 let gpsMarker = null;
@@ -350,7 +416,8 @@ function computeCumulativeDistances(latlngs){ let arr=[0], tot=0; for(let i=1;i<
 /* --------------------- CHART PROFIL --------------------- */
 let elevationChart = null;
 function drawElevation(elevations, latlngs=[]){
-  const smooth = smoothArray(elevations.map(e=>Math.round(e||0)), 0.22);
+  // smoothing alpha 0.22 (original)
+  const smooth = elevations && elevations.length ? smoothArray(elevations.map(e=>Math.round(e||0)), 0.22) : [];
   const gain = computeElevationGain(smooth);
   const mm = computeMinMax(smooth);
   const cumulative = latlngs.length ? computeCumulativeDistances(latlngs) : smooth.map((_,i)=>i);
@@ -483,7 +550,7 @@ document.getElementById('importFile').addEventListener('change', async (evt) => 
   L.polyline(manualRouteCoords.map(c=>[c[0],c[1]]), { color:"red", weight:2 }).addTo(routeLayer);
 
   const bounds = manualRouteCoords.map(c => [c[0], c[1]]);
-  fitBoundsNoZoom(bounds);
+  map.fitBounds(bounds, { padding: [20, 20] });
 
   drawElevation(manualRouteCoords.map(c=>c[2]||0), manualRouteCoords.map(c=>[c[0],c[1]]));
   manualPoints = [];
@@ -507,6 +574,7 @@ function exportGPX(){
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "trace_complete.gpx"; a.click();
 
   try {
+    // Injection du fichier dans le formulaire caché IBP et soumission (comme original)
     const file = new File([blob],"trace_complete.gpx",{ type:"application/gpx+xml" });
     const dt = new DataTransfer(); dt.items.add(file);
     document.getElementById('ibpFile').files = dt.files;
@@ -546,17 +614,16 @@ $("#formuploadajax").on("submit", function(e){
     contentType: false,
     processData: false
   }).done(function(javascript_json){
-    let weobtain = `<h3>Résultat IBP HKG</h3><b>Référence :</b> ${javascript_json.reference}<br><b>Fichier :</b> ${javascript_json.filename}<br><br>🥾 <b>IBP Randonnée (HKG) :</b> <span style="font-size:22px;color:#2a66c7">${javascript_json.hiking.ibp}</span><br><br>⬆️ <b>Dénivelé cumulé :</b> ${javascript_json.hiking.accuclimb} m<br>⏱ <b>Temps arrêt :</b> ${javascript_json.hiking.totalstoptime} s`;
-    document.getElementById("obtain").innerHTML = weobtain;
+    try {
+      let weobtain = `<h3>Résultat IBP HKG</h3><b>Référence :</b> ${javascript_json.reference}<br><b>Fichier :</b> ${javascript_json.filename}<br><br>🥾 <b>IBP Randonnée (HKG) :</b> <span style="font-size:22px;color:#2a66c7">${javascript_json.hiking.ibp}</span><br><br>⬆️ <b>Dénivelé cumulé :</b> ${javascript_json.hiking.accuclimb} m<br>⏱ <b>Temps arrêt :</b> ${javascript_json.hiking.totalstoptime} s`;
+      document.getElementById("obtain").innerHTML = weobtain;
+    } catch(err){
+      document.getElementById("obtain").innerHTML = "✅ Résultat reçu (format inattendu).";
+      console.error("IBP parse error:", err, javascript_json);
+    }
   }).fail(function(){ document.getElementById("obtain").innerHTML = "❌ Erreur lors du calcul IBP."; });
 });
 
-/* --------------------- SENTIERS ON/OFF --------------------- */
-function toggleHikingTrails(){ if(hikingVisible) map.removeLayer(hikingTrailsLayer); else hikingTrailsLayer.addTo(map); hikingVisible = !hikingVisible; }
-function toggleThunderforestTrails(){
-  if (thunderforestVisible) map.removeLayer(thunderforestTrails); else thunderforestTrails.addTo(map);
-  thunderforestVisible = !thunderforestVisible;
-}
 
 /* --------------------- RECHERCHE LIEU (Nominatim) --------------------- */
 async function searchLocation(){
@@ -612,103 +679,6 @@ function toggleInfoPanel(){
 }
 
 </script>
-<script>
-  const input = document.getElementById('searchInput');
-
-  // ✅ Validation avec la touche Entrée (CR)
-  input.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.isComposing) {
-      e.preventDefault();
-      const query = input.value.trim();
-      if (!query) return;
-      searchWithNominatim(query);
-    }
-  });
-
-  // ✅ Recherche réelle avec Nominatim + centrage carte
-  function searchWithNominatim(query) {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(results => {
-        if (!results || results.length === 0) {
-          alert("Aucun résultat trouvé");
-          return;
-        }
-
-        const lat = parseFloat(results[0].lat);
-        const lon = parseFloat(results[0].lon);
-
-        // ✅ Centre la carte (⚠️ votre carte doit s'appeler "map")
-        setViewNoZoom(lat, lon);
-
-        // ✅ Supprime l’ancien marqueur si présent
-        if (window.searchMarker) {
-          map.removeLayer(window.searchMarker);
-        }
-
-        // ✅ Nouveau marqueur
-        window.searchMarker = L.marker([lat, lon]).addTo(map)
-          .bindPopup(results[0].display_name)
-          .openPopup();
-      })
-      .catch(err => {
-        console.error("Erreur Nominatim :", err);
-        alert("Erreur lors de la recherche");
-      });
-  }
-</script>
-
-<script>
-  const searchInput = document.getElementById('searchInput');
-
-  /* ✅ Ferme le clavier dès qu'on touche la carte */
-  map.getContainer().addEventListener('touchstart', function () {
-    searchInput.blur();
-  });
-
-  map.getContainer().addEventListener('mousedown', function () {
-    searchInput.blur();
-  });
-
-  /* ✅ Corrige la perte de contrôle tactile après recherche */
-  function restoreMapFocus() {
-    setTimeout(function () {
-      map.invalidateSize();
-    }, 400);
-  }
-
-  /* ✅ On modifie DIRECTEMENT votre fonction Nominatim existante */
-  const oldSearch = searchWithNominatim;
-
-  searchWithNominatim = function(query) {
-    oldSearch(query);
-    searchInput.blur();      // ferme le clavier
-    restoreMapFocus();       // restaure les événements tactiles
-  };
-
-  /* ✅ Empêche l'input de voler le scroll à la carte */
-  searchInput.addEventListener('touchmove', function(e) {
-    e.stopPropagation();
-  });
-  /* =====================
-   EMPÊCHER LE ZOOM AUTO
-   ===================== */
-function setViewNoZoom(lat, lon) {
-  const currentZoom = map.getZoom();
-  map.setView([lat, lon], currentZoom);
-}
-
-function fitBoundsNoZoom(bounds) {
-  const currentZoom = map.getZoom();
-  map.fitBounds(bounds);
-  map.setZoom(currentZoom);
-}
-
-</script>
-
-
 
 </body>
 </html>
