@@ -330,6 +330,22 @@ body {
     <input id="searchInput" type="search" placeholder="🔍 Rechercher un lieu" aria-label="Rechercher un lieu">
     <input id="importFile" type="file" accept=".gpx,application/gpx+xml,application/json,application/geo+json" aria-label="Importer GPX">
   </div>
+<!-- juste sous ton input de recherche (dans la top-bar) -->
+<div id="searchResults" style="
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  max-width: calc(100% - 20px);
+  background: rgba(255,255,255,0.98);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  border-radius: 8px;
+  z-index: 3000;
+  display: none;
+  overflow: auto;
+  max-height: 240px;
+"></div>
 
   <!-- Infos / profil / résultat -->
   <div class="container" style="padding:10px;">
@@ -661,19 +677,95 @@ $("#formuploadajax").on("submit", function(e){
 
 
 /* --------------------- RECHERCHE LIEU (Nominatim) --------------------- */
-async function searchLocation(){
+// couche pour marqueur(s) de recherche (permet de nettoyer facilement)
+let searchMarkerGroup = L.layerGroup().addTo(map);
+
+/**
+ * Recherche Nominatim robuste :
+ * - limite 6 résultats
+ * - encodage propre
+ * - affiche liste cliquable
+ * - ajoute un marqueur / recentre la carte
+ */
+async function searchLocation() {
   const q = document.getElementById('searchInput').value.trim();
-  if(!q) return alert("Entrez un nom de lieu");
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
-  try{
-    const res = await fetch(url, { headers: { "Accept":"application/json", "User-Agent":"rando-app" }});
+  const resultsDiv = document.getElementById('searchResults');
+
+  // cache la liste si vide / requête vide
+  if (!q) {
+    resultsDiv.style.display = 'none';
+    resultsDiv.innerHTML = '';
+    return alert("Entrez un nom de lieu");
+  }
+
+  // construire URL (format=jsonv2 est plus stable)
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&addressdetails=1&accept-language=fr`;
+
+  try {
+    // simple feedback utilisateur
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<div style="padding:10px;color:#666;font-size:13px;">🔎 Recherche...</div>';
+
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
     const data = await res.json();
-    if(!data.length) return alert("Lieu introuvable");
-    const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
-    map.setView([lat,lon],14);
-    L.marker([lat,lon]).addTo(map).bindPopup(data[0].display_name).openPopup();
-  } catch(err){ console.error("searchLocation error:", err); alert("Erreur de recherche"); }
+    if (!data || !data.length) {
+      resultsDiv.innerHTML = '<div style="padding:10px;color:#666;font-size:13px;">Aucun résultat.</div>';
+      return;
+    }
+
+    // construire la liste
+    resultsDiv.innerHTML = '';
+    data.forEach((place, idx) => {
+      const display = place.display_name || (place.name || 'Lieu inconnu');
+      const lat = parseFloat(place.lat), lon = parseFloat(place.lon);
+      const type = place.type ? place.type : (place.class ? place.class : '');
+      const item = document.createElement('div');
+      item.className = 'result';
+      item.innerHTML = `<div>${display}</div><div class="place-type">${type}</div>`;
+      item.onclick = () => {
+        // recentre carte + ajoute marqueur propre
+        map.setView([lat, lon], Math.max(13, place.zoom ? +place.zoom : 14));
+        searchMarkerGroup.clearLayers();
+        const mk = L.marker([lat, lon]).addTo(searchMarkerGroup).bindPopup(`<b>${display}</b>`).openPopup();
+
+        // masquer la liste de résultats
+        resultsDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+      };
+      resultsDiv.appendChild(item);
+    });
+
+    // ajouter une ligne cliquable pour centrer sur le premier résultat immédiatement
+    const first = data[0];
+    if (first) {
+      map.setView([parseFloat(first.lat), parseFloat(first.lon)], Math.max(13, first.zoom ? +first.zoom : 14));
+      searchMarkerGroup.clearLayers();
+      L.marker([parseFloat(first.lat), parseFloat(first.lon)]).addTo(searchMarkerGroup).bindPopup(first.display_name || '').openPopup();
+    }
+
+  } catch (err) {
+    console.error("searchLocation error:", err);
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = `<div style="padding:10px;color:#900;font-size:13px;">Erreur de recherche (${err.message})</div>`;
+  }
 }
+
+// close search results when clicking elsewhere on the map or document
+map.on('click', () => {
+  const resultsDiv = document.getElementById('searchResults');
+  if (resultsDiv) { resultsDiv.style.display = 'none'; resultsDiv.innerHTML = ''; }
+});
+document.addEventListener('click', (e) => {
+  const topBar = document.querySelector('.top-bar');
+  const resultsDiv = document.getElementById('searchResults');
+  if (!topBar.contains(e.target) && resultsDiv) { resultsDiv.style.display = 'none'; resultsDiv.innerHTML = ''; }
+});
+
+document.getElementById('searchInput').addEventListener('keydown', function(e){
+  if(e.key === 'Enter') { e.preventDefault(); searchLocation(); }
+});
 
 /* --------------------- ICÔNES AVANCEES: GPS / REC --------------------- */
 function centerGPS(){ if(gpsMarker) map.setView(gpsMarker.getLatLng(),14); }
