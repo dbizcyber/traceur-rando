@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 <head>
-<!doctype html>
+
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -285,6 +285,41 @@ body {
 
   <!-- Carte -->
   <div id="map"></div>
+  <div id="startupPopup" style="
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 5000;
+  font-family: Arial, sans-serif;
+">
+  <div style="
+    background: white;
+    color: #333;
+    padding: 20px;
+    width: 85%;
+    max-width: 300px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  ">
+    <h3 style="margin-top:0;">👋 Bienvenue sur MapyBibi v6.6.3 !</h3>
+    <p>Activez le GPS pour un suivi optimal. L'export d'un tracé calcule IBP. Pas d'IBP sur un import GPX. Il est possible que les GPX ne soient pas reconnus. A l'import d'un GPX, vérifiez les infos relatives au tracé</p>
+    <button onclick="closeStartupPopup()" style="
+      margin-top: 12px;
+      padding: 8px 14px;
+      border: none;
+      background: #2a66c7;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+    ">OK</button>
+  </div>
+</div>
+
   <button class="info-toggle" onclick="toggleInfoPanel()">
   📊 Infos
 </button>
@@ -677,6 +712,13 @@ function toggleInfoPanel(){
   const panel = document.querySelector('.container');
   panel.classList.toggle('open');
 }
+function closeStartupPopup() {
+  document.getElementById("startupPopup").style.display = "none";
+}
+
+window.addEventListener("load", () => {
+  document.getElementById("startupPopup").style.display = "flex";
+});
 
 </script>
 
