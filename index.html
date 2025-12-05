@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="fr">
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 <head>
+
   <meta charset="utf-8">
 <title>Traceur randonnée val6.5.2 -> 6.6 mobile - IBP - thunderforest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -482,7 +483,7 @@ document.getElementById('importFile').addEventListener('change', async (evt) => 
   L.polyline(manualRouteCoords.map(c=>[c[0],c[1]]), { color:"red", weight:2 }).addTo(routeLayer);
 
   const bounds = manualRouteCoords.map(c => [c[0], c[1]]);
-  map.fitBounds(bounds, { padding: [20, 20] });
+  fitBoundsNoZoom(bounds);
 
   drawElevation(manualRouteCoords.map(c=>c[2]||0), manualRouteCoords.map(c=>[c[0],c[1]]));
   manualPoints = [];
@@ -640,7 +641,7 @@ function toggleInfoPanel(){
         const lon = parseFloat(results[0].lon);
 
         // ✅ Centre la carte (⚠️ votre carte doit s'appeler "map")
-        map.setView([lat, lon], 14);
+        setViewNoZoom(lat, lon);
 
         // ✅ Supprime l’ancien marqueur si présent
         if (window.searchMarker) {
@@ -691,6 +692,20 @@ function toggleInfoPanel(){
   searchInput.addEventListener('touchmove', function(e) {
     e.stopPropagation();
   });
+  /* =====================
+   EMPÊCHER LE ZOOM AUTO
+   ===================== */
+function setViewNoZoom(lat, lon) {
+  const currentZoom = map.getZoom();
+  map.setView([lat, lon], currentZoom);
+}
+
+function fitBoundsNoZoom(bounds) {
+  const currentZoom = map.getZoom();
+  map.fitBounds(bounds);
+  map.setZoom(currentZoom);
+}
+
 </script>
 
 
