@@ -219,6 +219,9 @@ body {
   padding: 8px 14px;
   font-size: 14px;
 }
+.leaflet-container {
+  touch-action: pan-x pan-y !important;
+}
 
 </style>
 </head>
@@ -659,36 +662,37 @@ function toggleInfoPanel(){
 <script>
   const searchInput = document.getElementById('searchInput');
 
-  /* ✅ 1. Quand on clique sur la carte → on enlève le focus de l'input */
-  map.getContainer().addEventListener('touchstart', () => {
+  /* ✅ Ferme le clavier dès qu'on touche la carte */
+  map.getContainer().addEventListener('touchstart', function () {
     searchInput.blur();
   });
 
-  map.getContainer().addEventListener('mousedown', () => {
+  map.getContainer().addEventListener('mousedown', function () {
     searchInput.blur();
   });
 
-  /* ✅ 2. Après une recherche → on redonne un état propre à la carte */
+  /* ✅ Corrige la perte de contrôle tactile après recherche */
   function restoreMapFocus() {
-    setTimeout(() => {
-      map.invalidateSize();   // corrige le bug de redimensionnement mobile
-    }, 300);
+    setTimeout(function () {
+      map.invalidateSize();
+    }, 400);
   }
 
-  /* ✅ 3. On greffe ça à la recherche existante */
-  const originalSearchWithNominatim = searchWithNominatim;
+  /* ✅ On modifie DIRECTEMENT votre fonction Nominatim existante */
+  const oldSearch = searchWithNominatim;
 
   searchWithNominatim = function(query) {
-    originalSearchWithNominatim(query);
-    restoreMapFocus();
-    searchInput.blur(); // ferme le clavier après validation
+    oldSearch(query);
+    searchInput.blur();      // ferme le clavier
+    restoreMapFocus();       // restaure les événements tactiles
   };
 
-  /* ✅ 4. On empêche le "vol de scroll" entre l'input et la carte */
+  /* ✅ Empêche l'input de voler le scroll à la carte */
   searchInput.addEventListener('touchmove', function(e) {
     e.stopPropagation();
   });
 </script>
+
 
 
 </body>
