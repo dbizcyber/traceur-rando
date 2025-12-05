@@ -656,6 +656,39 @@ function toggleInfoPanel(){
   }
 </script>
 
+<script>
+  const searchInput = document.getElementById('searchInput');
+
+  /* ✅ 1. Quand on clique sur la carte → on enlève le focus de l'input */
+  map.getContainer().addEventListener('touchstart', () => {
+    searchInput.blur();
+  });
+
+  map.getContainer().addEventListener('mousedown', () => {
+    searchInput.blur();
+  });
+
+  /* ✅ 2. Après une recherche → on redonne un état propre à la carte */
+  function restoreMapFocus() {
+    setTimeout(() => {
+      map.invalidateSize();   // corrige le bug de redimensionnement mobile
+    }, 300);
+  }
+
+  /* ✅ 3. On greffe ça à la recherche existante */
+  const originalSearchWithNominatim = searchWithNominatim;
+
+  searchWithNominatim = function(query) {
+    originalSearchWithNominatim(query);
+    restoreMapFocus();
+    searchInput.blur(); // ferme le clavier après validation
+  };
+
+  /* ✅ 4. On empêche le "vol de scroll" entre l'input et la carte */
+  searchInput.addEventListener('touchmove', function(e) {
+    e.stopPropagation();
+  });
+</script>
 
 
 </body>
