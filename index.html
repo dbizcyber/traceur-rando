@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="fr">
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2a66c7">
+<head>
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2a66c7">
 
-<!-- iOS -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Traceur Rando">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+  <!-- iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Traceur Rando">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
 <head>
 <meta charset="utf-8">
 <title>Traceur randonnée 6.6.4 mobile - IBP - thunderforest (rev)</title>
@@ -127,8 +129,11 @@
       <button id="openFileBtn" title="Importer GPX">Importer GPX</button>
       <span id="importStatus" aria-live="polite"></span>
     </div>
-    <!-- hidden actual file input (we'll trigger it programmatically) -->
-    <input id="importFile" type="file" accept=".gpx,application/gpx+xml,application/json,application/geo+json" style="display:none;" aria-hidden="true">
+    <!-- hidden actual file input (import de tous gpx)-->
+    <input id="importFile" type="file"
+  accept=".gpx,application/gpx+xml,application/octet-stream,text/xml,application/xml"
+  capture="filesystem"style="display:none;"aria-hidden="true">
+
   </div>
 
   <div id="searchResults"></div>
@@ -381,74 +386,92 @@ function convertGpxToGeoJSONFromXml(xmlDoc){
   throw new Error("Lib toGeoJSON introuvable");
 }
 
-/* main import handler */
+/******************************************************************
+ *   IMPORT GPX — VERSION VALIDÉE ET COMPLÈTE
+ ******************************************************************/
 async function handleFileImport(file){
   if(!file) return;
-  try{
-    document.getElementById('importStatus').textContent = 'import en cours...';
+
+  let geojson = null;
+  const statusEl = document.getElementById('importStatus');
+
+  try {
+    statusEl.textContent = 'import en cours...';
+
     const text = await readFileText(file);
-    let geojson=null;
-    try{
-      if(file.name.toLowerCase().endsWith('.gpx') || text.trim().startsWith('<')){
-        // parse xml safely
-        const xml = new DOMParser().parseFromString(text, "text/xml");
-        geojson = convertGpxToGeoJSONFromXml(xml);
-      } else {
-        geojson = JSON.parse(text);
-      }
-    } catch(e){
-      console.error("GPX->GeoJSON conversion error:", e);
-      document.getElementById('importStatus').textContent = 'Erreur: fichier invalide';
-      alert("Fichier invalide ou conversion GPX impossible (voir console).");
+
+    const isProbablyGPX =
+      (file.name && file.name.toLowerCase().endsWith(".gpx")) ||
+      (typeof text === "string" && (
+        text.trim().startsWith("<gpx") ||
+        text.includes("<trk") ||
+        text.includes("<trkpt")
+      ));
+
+    if(isProbablyGPX){
+      const xml = new DOMParser().parseFromString(text, "text/xml");
+      geojson = convertGpxToGeoJSONFromXml(xml);
+    } else {
+      geojson = JSON.parse(text);
+    }
+
+    if(!geojson || !geojson.features || !geojson.features.length){
+      statusEl.textContent = 'Aucune trace trouvée';
+      alert("Aucune trace exploitable trouvée.");
       return;
     }
 
-    // clear previous
+    // Reset
     manualPoints = [];
     manualRouteCoords = [];
     routeLayer.clearLayers();
     markers.clearLayers();
     editableMarkers.clearLayers();
 
-    // collect coordinates
     let coords = [];
-    (geojson.features || []).forEach(f => {
+
+    geojson.features.forEach(f=>{
       if(!f.geometry) return;
       if(f.geometry.type === "LineString") coords.push(...f.geometry.coordinates);
-      if(f.geometry.type === "MultiLineString") f.geometry.coordinates.forEach(seg => coords.push(...seg));
-      // also accept TrackPoints if provided as Points -> skip for now
+      if(f.geometry.type === "MultiLineString")
+        f.geometry.coordinates.forEach(seg=>coords.push(...seg));
+      if(f.geometry.type === "Point") coords.push(f.geometry.coordinates);
     });
 
     if(!coords.length){
-      document.getElementById('importStatus').textContent = 'Aucune trace trouvée';
-      alert("Aucune trace exploitable trouvée dans ce fichier GPX");
+      statusEl.textContent = 'Aucune trace trouvée';
+      alert("Trace non lisible.");
       return;
     }
 
-    // coords are [lng,lat,(ele)] -> convert to manualRouteCoords [lat,lng,ele]
-    coords.forEach(c => manualRouteCoords.push([c[1], c[0], c[2] || 0]));
-    const latlngs = manualRouteCoords.map(c => [c[0], c[1]]);
+    coords.forEach(c=>{
+      if(c.length >= 2){
+        manualRouteCoords.push([ c[1], c[0], c[2] || 0 ]);
+      }
+    });
+
+    const latlngs = manualRouteCoords.map(c=>[c[0],c[1]]);
+
     routeLayer.clearLayers();
-    L.polyline(latlngs, { color:"red", weight:4, smoothFactor:1.3 }).addTo(routeLayer);
+    L.polyline(latlngs, { color:"red", weight:4 }).addTo(routeLayer);
 
     createEditableMarkersFromCoords(latlngs);
     map.fitBounds(latlngs, { padding:[20,20] });
     drawElevation(manualRouteCoords.map(c=>c[2]||0), latlngs);
 
-    // reset manualPoints (user could re-create manual points if desired)
     manualPoints = [];
 
-    document.getElementById('importStatus').textContent = 'Import OK';
-    document.getElementById('distance').innerHTML += "<br>📂 Trace importée";
-    saveRouteLocal();
+    statusEl.textContent = 'Import OK';
+    setTimeout(()=> statusEl.textContent = '', 1800);
+
   } catch(err){
-    console.error("handleFileImport error:",err);
-    document.getElementById('importStatus').textContent = 'Erreur import';
-    alert("Erreur durant l'import (voir console).");
-  } finally {
-    setTimeout(()=>{ document.getElementById('importStatus').textContent=''; }, 2500);
+    console.error("Erreur import GPX:", err);
+    statusEl.textContent = 'Erreur import';
+    alert("Erreur durant l'import : " + err.message);
   }
 }
+
+
 
 /* wire hidden file input + visible button */
 const importFileInput = document.getElementById('importFile');
