@@ -5,3 +5,4 @@ modifié le 5/12/2025 perte de focus de la carte corrigé -
 ajout pop up d'informations avec N° de version -
 correction recherche par lieu -
 modif index version 6.6.4 du 9/12/25 -
+correction import des gpx sur android/Ios
