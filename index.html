@@ -148,11 +148,19 @@
 
 /* poignée toujours visible */
 .dock-handle{
-  width: 40px;
-  height: 5px;
-  border-radius: 3px;
-  background: rgba(255,255,255,0.75);
-  margin: 6px auto 8px auto;
+  width: 48px;                 /* plus large */
+  height: 6px;                 /* plus épais */
+  border-radius: 4px;
+  background: #c7302a;         /* ROUGE */
+  margin: 8px auto 10px auto;
+  box-shadow: 
+    0 0 8px rgba(199,48,42,0.9),
+    0 0 14px rgba(199,48,42,0.6); /* glow visible */
+}
+.leaflet-control.custom-panel.closed .dock-handle{
+  box-shadow:
+    0 0 12px rgba(199,48,42,1),
+    0 0 20px rgba(199,48,42,0.9);
 }
 
 /* dock fermé → descend MAIS garde la poignée visible */
