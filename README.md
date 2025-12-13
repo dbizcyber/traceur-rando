@@ -7,3 +7,4 @@ correction recherche par lieu -
 modif index version 6.6.4 du 9/12/25 -
 correction import des gpx sur android/Ios
 menu amovible en bas de l'écran avec poignée pour réapparaître
+menu "Infos" amovible en bas de l'écran avec poignée pour réapparaître
