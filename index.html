@@ -1,1169 +1,742 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <!-- PWA -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#2a66c7">
-
-  <!-- iOS -->
+  <meta name="theme-color" content="#1b4332">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Traceur Rando">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-
-<meta charset="utf-8">
-<title>Traceur randonnée dev_menu_6.6.4.3 mobile - IBP - thunderforest (rev)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Leaflet / libs -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- togeojson (conversion GPX -> GeoJSON) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
-<!-- togpx pour export GPX -->
-<script src="https://unpkg.com/togpx@0.5.0/togpx.js"></script>
-<script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
-
+  <meta charset="utf-8">
+  <title>Traceur Rando — La Marmotte</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+  <script src="https://unpkg.com/togpx@0.5.0/togpx.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
 <style>
-  :root{
-    --dock-bottom: 14px;
-    --dock-bg: rgba(0,0,0,0.10);
-    --btn-bg: #4caf50; /* vert */
-    --accent: #2a66c7;
-  }
-  html,body { height:100%; margin:0; font-family:Arial,Helvetica,sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
-  #map { height: 100vh; width:100%; }
-  body { overflow-x:hidden; }
-  /* Top bar (search + import) */
-  .top-bar{
-    position: fixed;
-    top: calc(6px + env(safe-area-inset-top));
-    left: 50%;
-    transform: translateX(-50%);
-    display:flex;
-    gap:8px;
-    z-index:1400;
-    padding:6px 10px;
-    border-radius:20px;
-    align-items:center;
-    pointer-events:auto;
-  }
-  .top-bar input[type="text"], .top-bar input[type="search"]{ padding:6px 10px; border-radius:12px; border: none; height:34px; width:160px; }
-  .file-pill { display:inline-flex; align-items:center; gap:8px; border-radius:12px; padding:6px 8px; 
-  background:transparent !important; height:34px; }
-  .file-pill button { border:none; background:var(--accent); color:white; padding:6px 10px; border-radius:8px; cursor:pointer; }
+:root {
+  --green:     #1b4332;
+  --green-mid: #2d6a4f;
+  --green-lt:  #52b788;
+  --blue:      #2a66c7;
+  --neon:      #39ff14;
+  --red:       #e53e3e;
+  --tab-h:     calc(56px + env(safe-area-inset-bottom));
+  --hdr-h:     calc(54px + env(safe-area-inset-top));
+  --sheet-peek:64px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background: #000; color: #fff; overflow: hidden; }
 
-  /* Dock (bottom) safe area aware */
-  .leaflet-control.custom-panel{
-    position: fixed !important;
-    bottom: calc(var(--dock-bottom) + env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    z-index:1500;
-    pointer-events:auto;
-    background: transparent !important;
-    border:none !important;
-    box-shadow:none !important;
-    padding: 0;
-    width: auto;
-  }
-  .icon-grid{
-  display:flex;
-  gap:8px;
-  padding:6px;
-  background:none;           /* AUCUN fond */
-  border-radius:0;
+#map {
+  position: fixed; inset: 0;
+  top: var(--hdr-h);
+  bottom: var(--tab-h);
+  z-index: 1;
 }
 
-  .icon-btn{
-  width:36px;
-  height:36px;
-  border-radius:50%;
-  border:none;
-  background:#39ff14;        /* VERT FLUO */
-  color:#000;                /* icône lisible */
-  font-size:16px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  box-shadow:none;           /* PAS de halo */
+/* HEADER */
+#app-header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--hdr-h); background: var(--green);
+  z-index: 100; display: flex; align-items: flex-end;
+  padding: 0 12px 8px; gap: 10px;
+  padding-top: env(safe-area-inset-top);
+}
+.logo { font-size: 22px; line-height: 1; flex-shrink: 0; }
+#searchInput {
+  flex: 1; background: rgba(255,255,255,.15); border: none;
+  border-radius: 22px; padding: 8px 14px; font-size: 15px;
+  color: #fff; outline: none; -webkit-appearance: none;
+}
+#searchInput::placeholder { color: rgba(255,255,255,.5); }
+#searchInput:focus { background: rgba(255,255,255,.22); }
+#search-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,.15); color: #fff; font-size: 16px;
+  cursor: pointer; flex-shrink: 0;
 }
 
-  .icon-btn.secondary{ background: rgba(0,0,0,0.22); }
-  .icon-btn.recording{ background: rgba(180,0,0,0.6); animation: pulse 1.2s infinite; }
-  @keyframes pulse{ 0%{transform:scale(1);}50%{transform:scale(1.08);}100%{transform:scale(1);} }
+/* SEARCH RESULTS */
+#searchResults {
+  position: fixed; top: var(--hdr-h); left: 10px; right: 10px;
+  background: #fff; color: #111; border-radius: 0 0 12px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3); z-index: 200;
+  display: none; max-height: 260px; overflow-y: auto;
+}
+.search-item { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.search-item:active { background: #f0fff4; }
+.search-item .sname { font-size: 13px; }
+.search-item .stype { font-size: 11px; color: #888; margin-top: 2px; }
 
-  /* ensure dock not flush to bottom on older iOS */
-  @supports (padding: env(safe-area-inset-bottom)) {
-    .leaflet-control.custom-panel { padding-bottom: calc(env(safe-area-inset-bottom)); }
-  }
+/* FABs */
+.fab {
+  position: fixed; z-index: 50; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; box-shadow: 0 3px 12px rgba(0,0,0,.4);
+  -webkit-tap-highlight-color: transparent;
+}
+#fab-gps    { bottom: calc(var(--tab-h) + var(--sheet-peek) + 14px); right: 14px; width: 46px; height: 46px; background: var(--blue); font-size: 20px; }
+#fab-layers { bottom: calc(var(--tab-h) + var(--sheet-peek) + 68px); right: 14px; width: 42px; height: 42px; background: rgba(20,20,20,.85); font-size: 18px; }
+.fab:active { transform: scale(.92); }
 
-  /* Info panel */
-.container{
-  position: fixed;
-  bottom: calc(0px + env(safe-area-inset-bottom));
-  left:0;
-  width:100%;
-  height:260px;
-  background:#f2f0f0;
-  color:#403e3e;
-  z-index:1400;
-  overflow:auto;
-  padding:10px;
-  box-sizing:border-box;
-  transition: transform 0.28s ease;
+/* BOTTOM SHEET */
+#bottom-sheet {
+  position: fixed; left: 0; right: 0; bottom: var(--tab-h);
+  z-index: 60; background: #111827;
+  border-radius: 18px 18px 0 0;
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  will-change: transform;
+}
+#bottom-sheet.collapsed { transform: translateY(calc(100% - var(--sheet-peek))); }
+#bottom-sheet.expanded  { transform: translateY(0); }
+
+.sheet-handle-wrap { padding: 10px 0 4px; display: flex; justify-content: center; cursor: pointer; }
+.sheet-handle { width: 38px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); }
+
+.sheet-peek {
+  display: flex; gap: 12px; padding: 0 16px 10px;
+  font-size: 12px; color: rgba(255,255,255,.6); flex-wrap: wrap;
+}
+.sheet-peek b { color: #fff; font-weight: 600; }
+
+.sheet-actions {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 8px; padding: 4px 12px 10px;
+}
+.act-btn {
+  background: rgba(255,255,255,.07); border: none; border-radius: 12px;
+  padding: 10px 4px 8px; display: flex; flex-direction: column;
+  align-items: center; gap: 5px; cursor: pointer; min-height: 62px;
+  color: #fff; -webkit-tap-highlight-color: transparent;
+}
+.act-btn:active { background: rgba(255,255,255,.18); transform: scale(.94); }
+.act-icon { font-size: 22px; line-height: 1; }
+.act-label { font-size: 10px; color: rgba(255,255,255,.6); text-align: center; line-height: 1.2; }
+.act-btn.primary { background: rgba(57,255,20,.12); }
+.act-btn.primary .act-label { color: #9aff72; }
+.act-btn.danger  { background: rgba(229,62,62,.12); }
+.act-btn.danger .act-label  { color: #fc8181; }
+.act-btn.is-active { background: rgba(57,255,20,.22); }
+
+#sheet-chart-area { padding: 0 12px 10px; display: none; }
+#sheet-chart-area.visible { display: block; }
+#elevationChart { width: 100% !important; height: 130px !important; }
+#distance { font-size: 11px; color: rgba(255,255,255,.6); padding: 4px 0 6px; }
+#obtain   { font-size: 12px; color: rgba(255,255,255,.75); padding: 4px 0; }
+#importStatus { font-size: 12px; color: var(--neon); padding: 2px 12px 8px; min-height: 18px; }
+
+/* TAB BAR */
+#tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: var(--tab-h); background: #0d1117;
+  border-top: 1px solid rgba(255,255,255,.07);
+  display: flex; z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; background: none; border: none;
+  color: rgba(255,255,255,.38); font-size: 10px; cursor: pointer;
+  padding: 6px 0 0; -webkit-tap-highlight-color: transparent;
+}
+.tab-icon { font-size: 20px; line-height: 1; }
+.tab.active { color: var(--neon); }
+.tab#tab-rec.recording { color: var(--red); }
+.tab#tab-rec.recording .tab-icon { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+
+/* STATS / OPTIONS PANELS */
+.side-panel {
+  position: fixed; inset: var(--hdr-h) 0 var(--tab-h) 0;
+  background: #0d1117; z-index: 80; display: none;
+  overflow-y: auto; padding: 16px;
+}
+.side-panel.visible { display: block; }
+.stat-card { background: rgba(255,255,255,.06); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+.stat-card h3 { font-size: 11px; color: rgba(255,255,255,.45); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat-val  { font-size: 24px; font-weight: 600; }
+.stat-unit { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
+#stats-chart-wrap { height: 160px; margin-top: 8px; }
+
+.opt-section { margin-bottom: 20px; }
+.opt-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.38); margin-bottom: 10px; }
+.opt-row {
+  background: rgba(255,255,255,.06); border-radius: 10px;
+  padding: 12px 14px; display: flex; align-items: center; gap: 12px;
+  margin-bottom: 6px; cursor: pointer;
+}
+.opt-row:active { background: rgba(255,255,255,.12); }
+.opt-icon  { font-size: 18px; width: 26px; text-align: center; }
+.opt-text  { flex: 1; }
+.opt-label { font-size: 14px; }
+.opt-desc  { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
+.opt-arrow { color: rgba(255,255,255,.28); font-size: 14px; }
+.layer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.layer-btn {
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px; padding: 7px 14px; font-size: 12px;
+  color: rgba(255,255,255,.65); cursor: pointer;
+}
+.layer-btn.active { background: rgba(57,255,20,.14); border-color: var(--neon); color: var(--neon); }
+
+/* POPUP */
+#startupPopup { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 5000; }
+.popup-box { background: #1a1a2e; border-radius: 16px; padding: 22px 20px; max-width: 340px; width: 92vw; }
+.popup-box h3 { font-size: 16px; margin-bottom: 8px; }
+.popup-box p  { font-size: 13px; color: rgba(255,255,255,.6); line-height: 1.55; margin-bottom: 16px; }
+.popup-box button { width: 100%; padding: 12px; background: var(--green-mid); border: none; border-radius: 10px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: calc(var(--tab-h) + var(--sheet-peek) + 14px);
+  left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.82); color: #fff;
+  padding: 8px 18px; border-radius: 20px; font-size: 13px;
+  z-index: 2000; display: none; pointer-events: none; white-space: nowrap;
 }
 
-/* état par défaut = fermé mais poignée visible */
-.container.closed{
-  transform: translateY(calc(100% - 28px));
+/* MAP extras */
+.distance-label {
+  background: rgba(255,255,255,.93); border: 1px dashed #c00;
+  border-radius: 6px; padding: 2px 6px;
+  font-size: 12px; font-weight: 700; color: #b30000; white-space: nowrap;
 }
-
-.container.open{
-  transform: translateY(0%);
-}
-
-
-  .info-toggle { position: fixed; bottom: calc(60px + env(safe-area-inset-bottom)); left:10px; z-index:1500; background:var(--accent); color:white; border:none; border-radius:20px; padding:8px 14px; cursor:pointer; }
-
-  /* ==== POIGNÉE DU PANNEAU INFOS ==== */
-
-.info-handle{
-  width: 42px;
-  height: 5px;
-  border-radius: 3px;
-  background: rgba(42,102,199,0.9);
-  margin: 6px auto 10px auto;
-  cursor: pointer;
-  box-shadow: 0 0 6px rgba(42,102,199,0.6);
-}
-
-  /* small screens */
-  @media (max-width:420px){
-    .top-bar input[type="search"]{ width:120px; font-size:13px; }
-    .icon-btn{ width:30px; height:30px; font-size:14px; }
-  }
-
-  .tooltip-mobile{ position:absolute; background:rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:6px; font-size:12px; z-index:2000; display:none; pointer-events:none; }
-
-  /* searchResults */
-  #searchResults{ position:absolute; top:48px; left:50%; transform:translateX(-50%); width:320px; max-width:calc(100% - 20px); background:#fff; color:#111; box-shadow:0 6px 18px rgba(0,0,0,0.12); border-radius:8px; z-index:3000; display:none; max-height:260px; overflow:auto; }
-
-  /* small cosmetics for import feedback */
-  #importStatus{ font-size:13px; color:#333; margin-left:8px; }
-
-  /* make map full height when content hidden */
-  body.fullscreen #map { height:100vh; }
-
-  /* keep touch interactions nice on leaflet */
-  .leaflet-container { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
-
-/* ==== DOCK AMOVIBLE (BOTTOM DRAWER) ==== */
-
-.leaflet-control.custom-panel{
-  transition: transform 0.28s ease;
-  touch-action: pan-y;
-}
-
-/* poignée toujours visible */
-.dock-handle{
-  width: 50px;                 /* plus large */
-  height: 8px;                 /* plus épais */
-  border-radius: 4px;
-  background:#39ff14;   /* VERT FLUO */
-  margin: 8px auto 10px auto;
-   box-shadow:
-    0 0 6px rgba(57,255,20,0.9),
-    0 0 12px rgba(57,255,20,0.6);
-}
-.leaflet-control.custom-panel.closed .dock-handle{
-  box-shadow:
-    0 0 12px rgba(199,48,42,1),
-    0 0 20px rgba(199,48,42,0.9);
-}
-
-/* dock fermé → descend MAIS garde la poignée visible */
-.leaflet-control.custom-panel.closed{
-  transform: translateX(-50%) translateY(48px);
-}
-.distance-label{
-  background: rgba(255,255,255,0.9);
-  border: 1px dashed red;
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 13px;
-  font-weight: bold;
-  color: #b30000;
-  white-space: nowrap;
-}
-
-
+.leaflet-container { touch-action: pan-x pan-y; }
+.leaflet-control-zoom { border-radius: 10px !important; }
+#importFile, #formuploadajax { display: none; }
 </style>
 </head>
 <body>
 
-  <div id="map"></div>
+<header id="app-header">
+  <span class="logo">🥾</span>
+  <input id="searchInput" type="search" placeholder="Rechercher un lieu…" autocomplete="off">
+  <button id="search-btn" onclick="searchLocation()">🔍</button>
+</header>
 
-  <!-- STARTUP POPUP -->
-  <div id="startupPopup" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:5000;font-family:Arial;">
-    <div style="background:#fff;padding:18px;border-radius:12px;max-width:340px;text-align:left;box-shadow:0 6px 20px rgba(0,0,0,0.25);">
-      <h3 style="margin:0 0 6px 0;">👋 Bienvenue</h3>
-      <p style="margin:0 0 8px 0;font-size:13px;color:#333;">Version 6.7 03/04/26//dev. par Bibi et 😺. 10 corrections majeures.</p>
-      <div style="text-align:right"><button onclick="closeStartupPopup()" style="background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;">OK</button></div>
-    </div>
+<div id="searchResults"></div>
+<div id="map"></div>
+
+<button class="fab" id="fab-gps"    onclick="centerGPS()">📍</button>
+<button class="fab" id="fab-layers" onclick="switchTab('options')">🗺️</button>
+
+<!-- BOTTOM SHEET -->
+<div id="bottom-sheet" class="collapsed">
+  <div class="sheet-handle-wrap" id="sheet-handle-wrap">
+    <div class="sheet-handle"></div>
   </div>
-
-  <!-- TOP BAR: recherche + import -->
-  <div class="top-bar" role="region" aria-label="recherche et import gpx">
-    <input id="searchInput" type="search" placeholder="🔍 Rechercher un lieu" aria-label="Rechercher un lieu">
-    <!-- visible tactile import button -->
-    <div class="file-pill" role="button" aria-label="Importer GPX">
-      <span></span>
-      <button id="openFileBtn" title="Importer GPX">Importer GPX</button>
-      <span id="importStatus" aria-live="polite"></span>
-    </div>
-    <!-- hidden actual file input (import de tous gpx)-->
-    <input 
-  type="file" 
-  id="importFile" 
-  accept=".gpx,application/gpx+xml,application/xml,text/xml,application/octet-stream"
-style="display:none;"
-  aria-hidden="true"
-  />
-
+  <div class="sheet-peek">
+    Dist&nbsp;<b id="stat-dist">—</b>&nbsp;km &nbsp;
+    D+&nbsp;<b id="stat-dp">—</b>&nbsp;m &nbsp;
+    D-&nbsp;<b id="stat-dm">—</b>&nbsp;m
   </div>
-
-  <div id="searchResults"></div>
-
-  <!-- info panel (démarre fermé via class HTML, pas seulement JS) -->
-  <div class="container closed" aria-live="polite">
-    <!-- POIGNÉE DU PANNEAU INFOS (À AJOUTER ICI) -->
-  <div class="info-handle" aria-label="Ouvrir / fermer les infos"></div>
-
+  <div class="sheet-actions">
+    <button class="act-btn primary" onclick="exportGPX()">
+      <span class="act-icon">💾</span><span class="act-label">Exporter GPX</span>
+    </button>
+    <button class="act-btn" onclick="triggerImport()">
+      <span class="act-icon">📂</span><span class="act-label">Importer GPX</span>
+    </button>
+    <button class="act-btn" id="btn-a" onclick="setPointA()">
+      <span class="act-icon">🅰️</span><span class="act-label">Point A</span>
+    </button>
+    <button class="act-btn" id="btn-b" onclick="setPointB()">
+      <span class="act-icon">🅱️</span><span class="act-label">Point B</span>
+    </button>
+    <button class="act-btn" onclick="drawStraightLine()">
+      <span class="act-icon">📏</span><span class="act-label">Ligne A→B</span>
+    </button>
+    <button class="act-btn" onclick="removeLastPoint()">
+      <span class="act-icon">↩️</span><span class="act-label">Annuler pt</span>
+    </button>
+    <button class="act-btn danger" onclick="confirmClearAll()">
+      <span class="act-icon">🗑️</span><span class="act-label">Effacer tout</span>
+    </button>
+    <button class="act-btn" id="btn-chart" onclick="toggleChartArea()">
+      <span class="act-icon">📊</span><span class="act-label">Profil</span>
+    </button>
+  </div>
+  <div id="sheet-chart-area">
     <div id="distance"></div>
-    <canvas id="elevationChart" style="width:100%;height:160px;"></canvas>
-    <form id="formuploadajax" enctype="multipart/form-data" style="display:none;">
-      <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
-      <input type="hidden" name="type" value="hiking">
-      <input type="file" id="ibpFile" name="file" accept=".gpx">
-    </form>
+    <canvas id="elevationChart"></canvas>
     <div id="obtain"></div>
   </div>
+  <div id="importStatus"></div>
+</div>
 
-  <div id="mobileTooltip" class="tooltip-mobile"></div>
+<!-- STATS PANEL -->
+<div class="side-panel" id="stats-panel">
+  <div class="stat-card">
+    <h3>Trace actuelle</h3>
+    <div class="stat-grid">
+      <div><div class="stat-val" id="sp-dist">—</div><div class="stat-unit">km distance</div></div>
+      <div><div class="stat-val" id="sp-dp">—</div><div class="stat-unit">m dénivelé +</div></div>
+      <div><div class="stat-val" id="sp-dm">—</div><div class="stat-unit">m dénivelé −</div></div>
+      <div><div class="stat-val" id="sp-ibp">—</div><div class="stat-unit">indice IBP</div></div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <h3>Profil altimétrique</h3>
+    <div id="stats-chart-wrap"><canvas id="elevationChartStats"></canvas></div>
+  </div>
+</div>
+
+<!-- OPTIONS PANEL -->
+<div class="side-panel" id="options-panel">
+  <div class="opt-section">
+    <h3>Fond de carte</h3>
+    <div class="layer-btns">
+      <button class="layer-btn active" id="layer-osm" onclick="switchLayer('osm')">OpenStreetMap</button>
+      <button class="layer-btn"        id="layer-tf"  onclick="switchLayer('tf')">Thunderforest</button>
+    </div>
+  </div>
+  <div class="opt-section">
+    <h3>Surcouches</h3>
+    <div class="opt-row" onclick="toggleOverlay('hiking')">
+      <span class="opt-icon">🥾</span>
+      <div class="opt-text"><div class="opt-label">Sentiers balisés</div><div class="opt-desc">Waymarked Trails</div></div>
+      <span class="opt-arrow" id="ov-hiking">○</span>
+    </div>
+    <div class="opt-row" onclick="toggleOverlay('route')">
+      <span class="opt-icon">🟢</span>
+      <div class="opt-text"><div class="opt-label">Trace ORS</div><div class="opt-desc">Itinéraire calculé</div></div>
+      <span class="opt-arrow" id="ov-route">●</span>
+    </div>
+    <div class="opt-row" onclick="toggleOverlay('markers')">
+      <span class="opt-icon">📌</span>
+      <div class="opt-text"><div class="opt-label">Points manuels</div><div class="opt-desc">Points de passage</div></div>
+      <span class="opt-arrow" id="ov-markers">●</span>
+    </div>
+  </div>
+  <div class="opt-section">
+    <h3>IBP</h3>
+    <div class="opt-row" onclick="computeIBP()">
+      <span class="opt-icon">🧮</span>
+      <div class="opt-text"><div class="opt-label">Calculer l'IBP</div><div class="opt-desc">Via ibpindex.com</div></div>
+      <span class="opt-arrow">›</span>
+    </div>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<nav id="tab-bar">
+  <button class="tab active" id="tab-map"     onclick="switchTab('map')">
+    <span class="tab-icon">🗺️</span><span>Carte</span>
+  </button>
+  <button class="tab" id="tab-rec" onclick="toggleAutoRecording()">
+    <span class="tab-icon">⏺️</span><span>Enreg.</span>
+  </button>
+  <button class="tab" id="tab-stats"    onclick="switchTab('stats')">
+    <span class="tab-icon">📊</span><span>Stats</span>
+  </button>
+  <button class="tab" id="tab-options"  onclick="switchTab('options')">
+    <span class="tab-icon">⚙️</span><span>Options</span>
+  </button>
+</nav>
+
+<!-- POPUP -->
+<div id="startupPopup">
+  <div class="popup-box">
+    <h3>👋 Bienvenue</h3>
+    <p>Traceur Rando v7.0 — interface mobile optimisée.<br>
+      Tapez sur la carte pour tracer un itinéraire. Swipez le panneau bas pour accéder aux actions. Activez le GPS pour un suivi en temps réel.</p>
+    <button onclick="closeStartupPopup()">C'est parti 🥾</button>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept=".gpx,application/gpx+xml,application/xml,text/xml">
+<form id="formuploadajax" enctype="multipart/form-data">
+  <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
+  <input type="hidden" name="type" value="hiking">
+  <input type="file" id="ibpFile" name="file" accept=".gpx">
+</form>
+<div id="toast"></div>
 
 <script>
-/* --------------------- CONFIG / CONST --------------------- */
-/* ⚠️  CLÉ API — ne pas versionner en clair sur un dépôt public.
-   Idéalement : stocker dans un proxy serveur ou une variable d'env.
-   Valeur actuelle conservée pour compatibilité — à remplacer côté serveur. */
-const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0=";
-const ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
-/* -------- ALTITUDE ORS (cache + throttle) -------- */
-let lastAltRequest = 0;
-const ALT_THROTTLE = 30000; // 30 s
-let cachedAlt = null;
-let cachedAltLatLng = null;
-const ALT_MIN_DIST = 25; // mètres
-async function fetchORSAltitude(lat, lng){
-  const res = await fetch(
-    "https://api.openrouteservice.org/elevation/point",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": ORS_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        geometry: { coordinates: [lng, lat] }
-      })
-    }
-  );
-  const data = await res.json();
-  return Math.round(data.geometry.coordinates[2]);
+/* ── CONFIG ── */
+const ORS_KEY  = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0=";
+const ORS_URL  = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
+const SKEY     = "traceur_manual_route_v1";
+
+let lastAltRequest=0; const ALT_THR=30000;
+let cachedAlt=null, cachedAltLL=null; const ALT_DIST=25;
+function isOnline(){ return navigator.onLine; }
+async function fetchAlt(lat,lng){
+  const r=await fetch("https://api.openrouteservice.org/elevation/point",{ method:"POST", headers:{"Authorization":ORS_KEY,"Content-Type":"application/json"}, body:JSON.stringify({geometry:{coordinates:[lng,lat]}}) });
+  const d=await r.json(); return Math.round(d.geometry.coordinates[2]);
 }
 
-function isOnline(){
-  return navigator.onLine;
-}
+/* ── CARTE ── */
+const map=L.map('map',{zoomControl:false}).setView([46.8,2.2],6);
+L.control.zoom({position:'topright'}).addTo(map);
 
-/* --------------------- CARTE / LAYERS --------------------- */
-const map = L.map('map').setView([46.8,2.2],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+const tfLayer =L.tileLayer("https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",{maxZoom:22});
+const hikingOv=L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{maxZoom:18,opacity:.9});
+osmLayer.addTo(map);
+let curBase='osm';
+const ovState={hiking:false,route:true,markers:true};
 
-let markers = L.layerGroup().addTo(map);
-let routeLayer = L.layerGroup().addTo(map);
-let straightLineLayer = L.layerGroup().addTo(map);
-let editableMarkers = L.layerGroup().addTo(map); // pour édition
-let editPointsLayer = L.layerGroup().addTo(map); // points éditables visibles
-let manualPoints = [];          // points (lng,lat) passés à ORS multi-points
-let manualRouteCoords = [];     // [ [lat,lng,ele], ... ] : trace calculée / importée
+let markers=L.layerGroup().addTo(map);
+let routeLayer=L.layerGroup().addTo(map);
+let slLayer=L.layerGroup().addTo(map);
+let editMarkers=L.layerGroup().addTo(map);
+let editPts=L.layerGroup().addTo(map);
+let searchGrp=L.layerGroup().addTo(map);
 
-let A=null,B=null, markerA=null, markerB=null, straightLine=null;
-let modeAB = false;
+let manualPts=[],manualCoords=[];
+let A=null,B=null,mA=null,mB=null,sl=null,modeAB=false,importedTrace=false;
 
-/* thunderforest / hiking layers (préservés) */
-const thunderforestTrails = L.tileLayer("https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",{ maxZoom:22, attribution:"Maps © Thunderforest, Data © OSM" });
-const hikingTrailsLayer = L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{ maxZoom:18, opacity:0.9, attribution:"© Waymarked Trails / OSM" });
-
-/* panel bottom */
-const panel = L.control({ position: 'bottomleft' });
-panel.onAdd = function(){
-  const div = L.DomUtil.create('div','leaflet-control custom-panel');
-div.innerHTML = `
-  <div class="dock-wrapper">
-  <div class="dock-handle" aria-label="Ouvrir le menu"></div>
-  <div class="icon-grid" role="toolbar" aria-label="menu actions">
-
-
-    <button class="icon-btn" onclick="searchLocation()" title="Rechercher">🔍</button>
-    <button class="icon-btn" onclick="setPointA()" title="Point A">🅰️</button>
-    <button class="icon-btn" onclick="setPointB()" title="Point B">🅱️</button>
-    <button class="icon-btn" onclick="drawStraightLine()" title="Ligne A→B">📏</button>
-    <button class="icon-btn secondary" onclick="removeLastPoint()" title="Annuler dernier point">↩️</button>
-    <button class="icon-btn secondary" onclick="clearAll()" title="Effacer tout">🗑️</button>
-    <button class="icon-btn" onclick="exportGPX()" title="Exporter GPX">💾</button>
-    <button class="icon-btn" onclick="toggleInfoPanel()" title="Infos">📊</button>
-    <button class="icon-btn" onclick="centerGPS()" title="Recentrer GPS">📍</button>
-    <button class="icon-btn" id="recBtn" onclick="toggleAutoRecording()" title="Enregistrement GPS">▶️</button>
-  </div>
-  </div>
-`;
-
-  L.DomEvent.disableClickPropagation(div);
-  L.DomEvent.disableScrollPropagation(div);
-
-  return div;
-};
-panel.addTo(map);
-
-/* layers control */
-const baseLayers = {
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-  "Thunderforest Outdoors": thunderforestTrails
-};
-const overlays = {
-  "Sentiers hiking (Waymarked Trails)": hikingTrailsLayer,
-  "Points manuels": markers,
-  "Ligne droite A→B": straightLineLayer,
-  "Trace ORS": routeLayer
-};
-L.control.layers(baseLayers, overlays, { collapsed:true, position:"topright" }).addTo(map);
-
-/* --------------------- GPS (pointeur) --------------------- */
-let gpsMarker = null;
-let gpsClickAttached = false;
-
+/* ── GPS ── */
+let gpsMarker=null,gpsAttached=false,gpsTracking=false,recTrace=[];
 if(navigator.geolocation){
   navigator.geolocation.watchPosition(pos=>{
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-    const alt = pos.coords.altitude;
-
-    const latlng = [lat, lng];
-
-    const redIcon = L.icon({
-      iconUrl:"https://upload.wikimedia.org/wikipedia/commons/e/ec/RedDot.svg",
-      iconSize:[14,14],
-      iconAnchor:[7,7]
-    });
-
-    if(!gpsMarker){
-      gpsMarker = L.marker(latlng,{icon:redIcon}).addTo(map);
-      map.setView(latlng,12);
-    } else {
-      gpsMarker.setLatLng(latlng);
-    }
-
-    // --- stocker altitude ---
-    gpsMarker._altitude = alt;
-
-    // --- enregistrement de trace (fusionné ici, était un second watchPosition) ---
-    if(gpsTracking) recordedTrace.push({ lat, lng, ele: alt || 0 });
-
-    // --- handler click (une seule fois) ---
-    if(!gpsClickAttached){
-      gpsClickAttached = true;
-
-      gpsMarker.on('click', async () => {
-
-  const p = gpsMarker.getLatLng();
-
-  const gpsAlt =
-    (gpsMarker._altitude !== null && gpsMarker._altitude !== undefined)
-    ? gpsMarker._altitude.toFixed(1)
-    : null;
-
-  let terrainAlt = cachedAlt;
-
-  // --- récupération terrain si nécessaire ---
-  if (!terrainAlt && isOnline()) {
-
-    const now = Date.now();
-    let needFetch = false;
-
-    if (!cachedAltLatLng) {
-      needFetch = true;
-    } else {
-      const d = L.latLng(cachedAltLatLng).distanceTo(p);
-      if (d > ALT_MIN_DIST) needFetch = true;
-    }
-
-    if (needFetch && now - lastAltRequest > ALT_THROTTLE) {
-      try {
-        terrainAlt = await fetchORSAltitude(p.lat, p.lng);
-        cachedAlt = terrainAlt;
-        cachedAltLatLng = p;
-        lastAltRequest = now;
-      } catch(e){
-        console.warn("ORS altitude error", e);
-      }
-    }
-  }
-
-  const gpsLine = gpsAlt
-    ? `📡 GPS : ${gpsAlt} m`
-    : `📡 GPS : —`;
-
-  const terrainLine = terrainAlt
-    ? `⛰️ Terrain : ${terrainAlt} m`
-    : `⛰️ Terrain : —`;
-
-  gpsMarker.bindPopup(`
-    <b>📍 Position</b><br>
-    Lat : ${p.lat.toFixed(6)}<br>
-    Lon : ${p.lng.toFixed(6)}<br><br>
-    ${gpsLine}<br>
-    ${terrainLine}
-  `).openPopup();
-});
-
-
-    }
-
-  }, err=>console.warn("GPS:",err), { enableHighAccuracy:true });
-}
-
-
-/* --------------------- UTILS ELEVATION & DISTANCE --------------------- */
-function smoothArray(data, alpha=0.22){
-  if(!data.length) return data;
-  const out=new Array(data.length); out[0]=data[0];
-  for(let i=1;i<data.length;i++) out[i]=out[i-1]*(1-alpha)+data[i]*alpha;
-  out[out.length-1]=data[data.length-1];
-  return out;
-}
-function computeElevationGain(elev){
-  let up=0,down=0;
-  for(let i=1;i<elev.length;i++){ const d=elev[i]-elev[i-1]; if(d>0) up+=d; else down+=Math.abs(d); }
-  return {positive:Math.round(up), negative:Math.round(down)};
-}
-function computeMinMax(elev){ if(!elev.length) return {min:0,max:0}; return {min:Math.round(Math.min(...elev)), max:Math.round(Math.max(...elev))}; }
-function computeTotalDistanceLatLngs(latlngs){ if(!latlngs.length) return 0; let tot=0; for(let i=1;i<latlngs.length;i++) tot+=L.latLng(latlngs[i-1][0],latlngs[i-1][1]).distanceTo(L.latLng(latlngs[i][0],latlngs[i][1])); return tot; }
-function computeCumulativeDistances(latlngs){ let arr=[0], tot=0; for(let i=1;i<latlngs.length;i++){ tot+=L.latLng(latlngs[i-1][0],latlngs[i-1][1]).distanceTo(L.latLng(latlngs[i][0],latlngs[i][1])); arr.push((tot/1000).toFixed(3)); } return arr; }
-
-/* --------------------- ELEVATION CHART --------------------- */
-let elevationChart = null;
-function drawElevation(elevations, latlngs=[]){
-  const smooth = elevations && elevations.length ? smoothArray(elevations.map(e=>Math.round(e||0)), 0.22) : [];
-  const gain = computeElevationGain(smooth);
-  const mm = computeMinMax(smooth);
-  const cumulative = latlngs.length ? computeCumulativeDistances(latlngs) : smooth.map((_,i)=>i);
-  const ctx = document.getElementById('elevationChart').getContext('2d');
-  if(elevationChart) elevationChart.destroy();
-  elevationChart = new Chart(ctx, {
-    type:'line',
-    data:{ labels:cumulative, datasets:[{ label:'Altitude (m)', data:smooth, borderWidth:2, fill:false, tension:0.25, pointRadius:0 }]},
-    options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ title:{display:true,text:"Distance (km)"}}, y:{ title:{display:true,text:"Altitude (m)"} } } }
-  });
-  const totalDistance = latlngs.length ? (computeTotalDistanceLatLngs(latlngs)/1000).toFixed(2) : "0.00";
-  document.getElementById('distance').innerHTML = `<b>Distance totale :</b> ${totalDistance} km  -  ⬆️ <b>D+ :</b> ${gain.positive} m &nbsp; ⬇️ <b>D- :</b> ${gain.negative} m - 🔻 <b>Min :</b> ${mm.min} m | 🔺 <b>Max :</b> ${mm.max} m`;
-}
-
-/* --------------------- ORS: rebuild route from manualPoints (multipoints) --------------------- */
-let orsRequestInProgress = false;   // ← MODIF A À AJOUTER ICI
-async function rebuildManualRouteFromPoints(){
-
-  // ===== MODIF B : VERROU ORS =====
-  if (orsRequestInProgress) return;
-  orsRequestInProgress = true;
-  // ===============================
-
-  routeLayer.clearLayers();
-  editableMarkers.clearLayers();
-  editPointsLayer.clearLayers();
-  manualRouteCoords = [];
-
-  if(manualPoints.length < 2){
-    orsRequestInProgress = false;   // ← IMPORTANT
-    drawElevation([],[]);
-    saveRouteLocal();
-    return;
-  }
-
-  try{
-    const res = await fetch(ORS_URL, {
-      method:"POST",
-      headers: { "Authorization": ORS_KEY, "Content-Type":"application/json" },
-      body: JSON.stringify({ coordinates: manualPoints, elevation:true, instructions:false, preference:"recommended" })
-    });
-    if(!res.ok) throw new Error("ORS HTTP " + res.status);
-    const data = await res.json();
-    if(!data.features || !data.features.length) throw new Error("ORS: pas de géométrie");
-
-    const coords = data.features[0].geometry.coordinates;
-    coords.forEach(c => manualRouteCoords.push([c[1], c[0], c[2] || 0]));
-    const latlngs = manualRouteCoords.map(c=>[c[0],c[1]]);
-    L.polyline(latlngs, { color:"green", weight:4, smoothFactor:1.2 }).addTo(routeLayer);
-
-    // création de markers éditables
-    createEditableMarkersFromCoords(latlngs);
-
-    drawElevation(manualRouteCoords.map(c=>c[2]||0), latlngs);
-    refreshMarkers(); // met à jour les points manuels si présents
-    saveRouteLocal();
-  } catch(err){
-  console.error("Erreur ORS multipoints:", err);
-} finally {
-  orsRequestInProgress = false;   // ← LIBÈRE LE VERROU
-}
-
-}
-
-/* --------------------- MAP CLICK POUR AJOUTER POINTS --------------------- */
-// FIX 8 — flag pour savoir si une trace importée est active
-let importedTrace = false;
-
-map.on('click', e => {
-  // 🔒 Si on est en mode A/B → PAS de tracé ORS
-  if(modeAB) return;
-
-  // FIX 8 — Si une trace GPX est importée, demander confirmation avant d'écraser
-  if(importedTrace){
-    if(!confirm("Une trace GPX est déjà chargée.\nCliquer sur la carte va démarrer un nouveau tracé ORS et effacer la trace importée. Continuer ?")) return;
-    importedTrace = false;
-    manualRouteCoords = [];
-    routeLayer.clearLayers();
-    editableMarkers.clearLayers();
-  }
-
-  manualPoints.push([e.latlng.lng, e.latlng.lat]);
-  rebuildManualRouteFromPoints();
-});
-
-
-/* --------------------- A/B déplaçable / Ligne droite --------------------- */
-function setPointA(){
-  modeAB = true;
-  showTooltip("Cliquez sur la carte pour placer le point A");
-  map.once('click', e => {
-    A = e.latlng;
-    if(markerA) straightLineLayer.removeLayer(markerA);
-    markerA = L.marker(A).addTo(straightLineLayer).bindPopup("A").openPopup();
-    modeAB = false;
-  });
-}
-
-function setPointB(){
-  modeAB = true;
-  showTooltip("Cliquez sur la carte pour placer le point B");
-  map.once('click', e => {
-    B = e.latlng;
-    if(markerB) straightLineLayer.removeLayer(markerB);
-    markerB = L.marker(B, { draggable: true })
-      .addTo(straightLineLayer)
-      .bindPopup("B")
-      .openPopup();
-    markerB.on('drag', () => {
-      B = markerB.getLatLng();
-      updateStraightLine();
-    });
-    modeAB = false;
-  });
-}
-
-function drawStraightLine(){
-
-  if(!A || !B){
-    alert("Définissez A et B avant de tracer la ligne droite.");
-    return;
-  }
-
-  // Nettoyage ancien tracé
-  if(straightLine){
-    straightLineLayer.removeLayer(straightLine);
-  }
-
-  // Ligne STRICTEMENT rectiligne
-  straightLine = L.polyline(
-    [[A.lat, A.lng], [B.lat, B.lng]],
-    {
-      color: "red",
-      weight: 3,
-      dashArray: "6,6"
-    }
-  ).addTo(straightLineLayer);
-  map.fitBounds([[A.lat,A.lng],[B.lat,B.lng]], { padding:[40,40] });
-  // ⬇️ ICI, À LA FIN DE LA FONCTION
-  modeAB = false;
-
-  // Calcul distance et label via updateStraightLine (évite distKm non déclaré)
-  updateStraightLine();
-
-}
-/* --------------------- Mise à jour dynamique de la ligne --------------------- */
-function updateStraightLine(){
-
-  if(!A || !B || !straightLine) return;
-
-  // Mise à jour de la ligne
-  straightLine.setLatLngs([
-    [A.lat, A.lng],
-    [B.lat, B.lng]
-  ]);
-
-  // Recalcul distance
-  const distKm = (A.distanceTo(B) / 1000).toFixed(2);
-
-  // Suppression ancien label distance
-  straightLineLayer.eachLayer(layer => {
-    if(layer.options && layer.options.icon && layer.options.icon.options.className === "distance-label"){
-      straightLineLayer.removeLayer(layer);
-    }
-  });
-
-  // Nouveau label au milieu
-  const midLat = (A.lat + B.lat) / 2;
-  const midLng = (A.lng + B.lng) / 2;
-
-  L.marker([midLat, midLng], {
-    icon: L.divIcon({
-      className: "distance-label",
-      html: `📏 ${distKm} km`,
-      iconSize: [80, 24]
-    }),
-    interactive: false
-  }).addTo(straightLineLayer);
-}
-
-
-/* --------------------- ORS A->B --------------------- */
-async function computeRoute(){
-  if(!A || !B) return alert("Définissez A et B pour calculer le tracé réel ORS entre eux.");
-  try{
-    const res = await fetch(ORS_URL, {
-      method:"POST",
-      headers: { "Authorization": ORS_KEY, "Content-Type":"application/json" },
-      body: JSON.stringify({ coordinates: [[A.lng,A.lat],[B.lng,B.lat]], elevation:true, instructions:false })
-    });
-    if(!res.ok) throw new Error("ORS HTTP " + res.status);
-    const data = await res.json();
-    const coords = data.features[0].geometry.coordinates.map(c=>[c[1],c[0]]);
-    const elev = data.features[0].geometry.coordinates.map(c=>c[2]||0);
-    routeLayer.clearLayers();
-    L.polyline(coords, { color:"blue", weight:4 }).addTo(routeLayer);
-    // save route
-    manualRouteCoords = coords.map((c,i)=>[c[0],c[1],elev[i]||0]);
-    createEditableMarkersFromCoords(coords);
-    drawElevation(elev, coords);
-    saveRouteLocal();
-    map.fitBounds(coords);
-  } catch(err){ console.error("Erreur computeRoute:",err); alert("Erreur ORS computeRoute."); }
-}
-
-/* --------------------- IMPORT GPX (robuste, mobile fallback) --------------------- */
-
-/**
- * readFileText(file) -> Promise<string>
- * - utilise file.text() si disponible
- * - sinon fallback FileReader
- */
-function readFileText(file){
-  return new Promise((resolve, reject) => {
-    if(file.text){
-      file.text().then(resolve).catch(() => {
-        // fallback
-        const fr=new FileReader();
-        fr.onload = () => resolve(fr.result);
-        fr.onerror = e => reject(e);
-        fr.readAsText(file);
+    const{latitude:lat,longitude:lng,altitude:alt}=pos.coords;
+    const ico=L.icon({iconUrl:"https://upload.wikimedia.org/wikipedia/commons/e/ec/RedDot.svg",iconSize:[14,14],iconAnchor:[7,7]});
+    if(!gpsMarker){ gpsMarker=L.marker([lat,lng],{icon:ico}).addTo(map); map.setView([lat,lng],12); }
+    else gpsMarker.setLatLng([lat,lng]);
+    gpsMarker._alt=alt;
+    if(gpsTracking) recTrace.push({lat,lng,ele:alt||0});
+    if(!gpsAttached){ gpsAttached=true;
+      gpsMarker.on('click',async()=>{
+        const p=gpsMarker.getLatLng();
+        const ga=gpsMarker._alt!=null?gpsMarker._alt.toFixed(1):null;
+        let ta=cachedAlt;
+        if(!ta&&isOnline()){
+          const now=Date.now();
+          const need=!cachedAltLL||L.latLng(cachedAltLL).distanceTo(p)>ALT_DIST;
+          if(need&&now-lastAltRequest>ALT_THR){ try{ ta=await fetchAlt(p.lat,p.lng); cachedAlt=ta; cachedAltLL=p; lastAltRequest=now; }catch(e){} }
+        }
+        gpsMarker.bindPopup(`<b>📍 Position</b><br>Lat:${p.lat.toFixed(6)}<br>Lon:${p.lng.toFixed(6)}<br><br>📡 GPS:${ga?ga+" m":"—"}<br>⛰️ Terrain:${ta?ta+" m":"—"}`).openPopup();
       });
-    } else {
-      const fr=new FileReader();
-      fr.onload = () => resolve(fr.result);
-      fr.onerror = e => reject(e);
-      fr.readAsText(file);
     }
+  },err=>console.warn("GPS:",err),{enableHighAccuracy:true});
+}
+function centerGPS(){ if(gpsMarker) map.setView(gpsMarker.getLatLng(),15); else showToast("GPS non disponible"); }
+
+/* ── CALCULS ── */
+function smooth(data,a=.22){ if(!data.length) return data; const o=new Array(data.length); o[0]=data[0]; for(let i=1;i<data.length;i++) o[i]=o[i-1]*(1-a)+data[i]*a; o[o.length-1]=data[data.length-1]; return o; }
+function gainElev(e){ let u=0,d=0; for(let i=1;i<e.length;i++){ const v=e[i]-e[i-1]; v>0?u+=v:d+=Math.abs(v); } return{pos:Math.round(u),neg:Math.round(d)}; }
+function totalDist(lls){ let t=0; for(let i=1;i<lls.length;i++) t+=L.latLng(lls[i-1]).distanceTo(L.latLng(lls[i])); return t; }
+function cumDist(lls){ let a=[0],t=0; for(let i=1;i<lls.length;i++){ t+=L.latLng(lls[i-1]).distanceTo(L.latLng(lls[i])); a.push((t/1000).toFixed(3)); } return a; }
+
+/* ── ELEVATION CHART ── */
+let chart1=null,chart2=null;
+function drawElevation(elevs,lls=[]){
+  const s=elevs&&elevs.length?smooth(elevs.map(e=>Math.round(e||0))):[];
+  const g=gainElev(s);
+  const km=lls.length?(totalDist(lls)/1000).toFixed(2):"0.00";
+  const cum=lls.length?cumDist(lls):s.map((_,i)=>i);
+  /* peek */
+  document.getElementById('stat-dist').textContent=km;
+  document.getElementById('stat-dp').textContent=g.pos;
+  document.getElementById('stat-dm').textContent=g.neg;
+  /* stats panel */
+  document.getElementById('sp-dist').textContent=km;
+  document.getElementById('sp-dp').textContent=g.pos;
+  document.getElementById('sp-dm').textContent=g.neg;
+  document.getElementById('distance').innerHTML=`<b>Distance:</b> ${km} km &nbsp;⬆️ D+ ${g.pos} m &nbsp;⬇️ D- ${g.neg} m`;
+  const cfg={type:'line',data:{labels:cum,datasets:[{label:'Altitude (m)',data:s,borderWidth:2,fill:true,borderColor:'#52b788',backgroundColor:'rgba(82,183,136,.15)',tension:.25,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(255,255,255,.5)',maxTicksLimit:5},grid:{color:'rgba(255,255,255,.07)'},title:{display:true,text:'km',color:'rgba(255,255,255,.4)'}},y:{ticks:{color:'rgba(255,255,255,.5)'},grid:{color:'rgba(255,255,255,.07)'},title:{display:true,text:'m',color:'rgba(255,255,255,.4)'}}}}};
+  const c1=document.getElementById('elevationChart').getContext('2d');
+  if(chart1) chart1.destroy();
+  chart1=new Chart(c1,JSON.parse(JSON.stringify(cfg)));
+  const c2=document.getElementById('elevationChartStats').getContext('2d');
+  if(chart2) chart2.destroy();
+  chart2=new Chart(c2,JSON.parse(JSON.stringify(cfg)));
+}
+
+/* ── ORS MULTIPOINTS ── */
+let orsRunning=false;
+async function rebuildRoute(){
+  if(orsRunning) return; orsRunning=true;
+  routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers(); manualCoords=[];
+  if(manualPts.length<2){ orsRunning=false; drawElevation([],[]); saveLocal(); return; }
+  try{
+    const r=await fetch(ORS_URL,{method:"POST",headers:{"Authorization":ORS_KEY,"Content-Type":"application/json"},body:JSON.stringify({coordinates:manualPts,elevation:true,instructions:false,preference:"recommended"})});
+    if(!r.ok) throw new Error("ORS "+r.status);
+    const d=await r.json();
+    if(!d.features||!d.features.length) throw new Error("ORS vide");
+    d.features[0].geometry.coordinates.forEach(c=>manualCoords.push([c[1],c[0],c[2]||0]));
+    const lls=manualCoords.map(c=>[c[0],c[1]]);
+    L.polyline(lls,{color:"#52b788",weight:4,smoothFactor:1.2}).addTo(routeLayer);
+    mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+    refreshPts(); saveLocal();
+  }catch(e){ console.error("ORS:",e); showToast("Erreur calcul ORS"); }
+  finally{ orsRunning=false; }
+}
+
+/* ── CLIC CARTE ── */
+map.on('click',e=>{
+  if(modeAB) return;
+  if(importedTrace){
+    if(!confirm("Une trace GPX est chargée.\nUn clic va démarrer un nouveau tracé et l'effacer. Continuer ?")) return;
+    importedTrace=false; manualCoords=[]; routeLayer.clearLayers(); editMarkers.clearLayers();
+  }
+  manualPts.push([e.latlng.lng,e.latlng.lat]);
+  rebuildRoute();
+});
+map.on('click',()=>{ document.getElementById('searchResults').style.display='none'; });
+
+/* ── POINTS A/B ── */
+function setPointA(){
+  modeAB=true; document.getElementById('btn-a').classList.add('is-active');
+  showToast("Tapez sur la carte pour placer A");
+  map.once('click',e=>{
+    A=e.latlng; if(mA) slLayer.removeLayer(mA);
+    mA=L.marker(A).addTo(slLayer).bindPopup("A").openPopup();
+    modeAB=false; document.getElementById('btn-a').classList.remove('is-active');
   });
 }
-
-/* safe conversion GPX -> GeoJSON using available lib */
-function convertGpxToGeoJSONFromXml(xmlDoc){
-  // try typical global names (togeojson or toGeoJSON)
-  if(window.toGeoJSON && typeof window.toGeoJSON.gpx === "function"){
-    return window.toGeoJSON.gpx(xmlDoc);
-  }
-  if(window.togeojson && typeof window.togeojson.gpx === "function"){
-    return window.togeojson.gpx(xmlDoc);
-  }
-  if(window.TO_GPX && typeof window.TO_GPX === "function"){
-    // improbable, fallback placeholder
-    return window.TO_GPX(xmlDoc);
-  }
-  throw new Error("Lib toGeoJSON introuvable");
+function setPointB(){
+  modeAB=true; document.getElementById('btn-b').classList.add('is-active');
+  showToast("Tapez sur la carte pour placer B");
+  map.once('click',e=>{
+    B=e.latlng; if(mB) slLayer.removeLayer(mB);
+    mB=L.marker(B,{draggable:true}).addTo(slLayer).bindPopup("B").openPopup();
+    mB.on('drag',()=>{ B=mB.getLatLng(); updateSL(); });
+    modeAB=false; document.getElementById('btn-b').classList.remove('is-active');
+  });
+}
+function drawStraightLine(){
+  if(!A||!B){ showToast("Définissez A et B d'abord"); return; }
+  if(sl) slLayer.removeLayer(sl);
+  sl=L.polyline([[A.lat,A.lng],[B.lat,B.lng]],{color:"red",weight:3,dashArray:"6,6"}).addTo(slLayer);
+  map.fitBounds([[A.lat,A.lng],[B.lat,B.lng]],{padding:[40,40]});
+  modeAB=false; updateSL();
+}
+function updateSL(){
+  if(!A||!B||!sl) return;
+  sl.setLatLngs([[A.lat,A.lng],[B.lat,B.lng]]);
+  const dk=(A.distanceTo(B)/1000).toFixed(2);
+  slLayer.eachLayer(l=>{ if(l.options&&l.options.icon&&l.options.icon.options.className==="distance-label") slLayer.removeLayer(l); });
+  L.marker([(A.lat+B.lat)/2,(A.lng+B.lng)/2],{icon:L.divIcon({className:"distance-label",html:`📏 ${dk} km`,iconSize:[90,24]}),interactive:false}).addTo(slLayer);
 }
 
-/******************************************************************
- *   IMPORT GPX — VERSION VALIDÉE ET COMPLÈTE
- ******************************************************************/
-async function handleFileImport(file){
+/* ── IMPORT GPX ── */
+function readFileText(file){
+  return new Promise((res,rej)=>{ if(file.text){ file.text().then(res).catch(()=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=e=>rej(e); fr.readAsText(file); }); } else{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=e=>rej(e); fr.readAsText(file); } });
+}
+function gpx2geo(xml){ if(window.toGeoJSON&&typeof window.toGeoJSON.gpx==="function") return window.toGeoJSON.gpx(xml); if(window.togeojson&&typeof window.togeojson.gpx==="function") return window.togeojson.gpx(xml); throw new Error("Lib toGeoJSON absente"); }
+async function handleImport(file){
   if(!file) return;
-
-  let geojson = null;
-  const statusEl = document.getElementById('importStatus');
-
-  try {
-    statusEl.textContent = 'import en cours...';
-
-    const text = await readFileText(file);
-
-    const isProbablyGPX =
-      (file.name && file.name.toLowerCase().endsWith(".gpx")) ||
-      (typeof text === "string" && (
-        text.trim().startsWith("<gpx") ||
-        text.includes("<trk") ||
-        text.includes("<trkpt")
-      ));
-
-    if(isProbablyGPX){
-      const xml = new DOMParser().parseFromString(text, "text/xml");
-      geojson = convertGpxToGeoJSONFromXml(xml);
-    } else {
-      geojson = JSON.parse(text);
-    }
-
-    if(!geojson || !geojson.features || !geojson.features.length){
-      statusEl.textContent = 'Aucune trace trouvée';
-      alert("Aucune trace exploitable trouvée.");
-      return;
-    }
-
-    // Reset
-    manualPoints = [];
-    manualRouteCoords = [];
-    routeLayer.clearLayers();
-    markers.clearLayers();
-    editableMarkers.clearLayers();
-
-    let coords = [];
-
-    geojson.features.forEach(f=>{
-      if(!f.geometry) return;
-      if(f.geometry.type === "LineString") coords.push(...f.geometry.coordinates);
-      if(f.geometry.type === "MultiLineString")
-        f.geometry.coordinates.forEach(seg=>coords.push(...seg));
-      if(f.geometry.type === "Point") coords.push(f.geometry.coordinates);
-    });
-
-    if(!coords.length){
-      statusEl.textContent = 'Aucune trace trouvée';
-      alert("Trace non lisible.");
-      return;
-    }
-
-    coords.forEach(c=>{
-      if(c.length >= 2){
-        manualRouteCoords.push([ c[1], c[0], c[2] || 0 ]);
-      }
-    });
-
-    const latlngs = manualRouteCoords.map(c=>[c[0],c[1]]);
-
-    routeLayer.clearLayers();
-    L.polyline(latlngs, { color:"red", weight:4 }).addTo(routeLayer);
-
-    createEditableMarkersFromCoords(latlngs);
-    map.fitBounds(latlngs, { padding:[20,20] });
-    drawElevation(manualRouteCoords.map(c=>c[2]||0), latlngs);
-
-    manualPoints = [];
-
-    importedTrace = true; // FIX 8 — trace importée active
-    statusEl.textContent = 'Import OK';
-    setTimeout(()=> statusEl.textContent = '', 1800);
-
-  } catch(err){
-    console.error("Erreur import GPX:", err);
-    statusEl.textContent = 'Erreur import';
-    alert("Erreur durant l'import : " + err.message);
-  }
+  const st=document.getElementById('importStatus');
+  try{
+    st.textContent='Import en cours…';
+    const text=await readFileText(file);
+    const isGPX=(file.name&&file.name.toLowerCase().endsWith(".gpx"))||(typeof text==="string"&&(text.trim().startsWith("<gpx")||text.includes("<trk")||text.includes("<trkpt")));
+    let geo=isGPX?gpx2geo(new DOMParser().parseFromString(text,"text/xml")):JSON.parse(text);
+    if(!geo||!geo.features||!geo.features.length){ st.textContent='Aucune trace'; alert("Aucune trace exploitable."); return; }
+    manualPts=[]; manualCoords=[]; routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers();
+    let coords=[];
+    geo.features.forEach(f=>{ if(!f.geometry) return; if(f.geometry.type==="LineString") coords.push(...f.geometry.coordinates); if(f.geometry.type==="MultiLineString") f.geometry.coordinates.forEach(s=>coords.push(...s)); });
+    if(!coords.length){ st.textContent='Trace non lisible'; alert("Trace non lisible."); return; }
+    coords.forEach(c=>{ if(c.length>=2) manualCoords.push([c[1],c[0],c[2]||0]); });
+    const lls=manualCoords.map(c=>[c[0],c[1]]);
+    L.polyline(lls,{color:"red",weight:4}).addTo(routeLayer);
+    mkEditable(lls); map.fitBounds(lls,{padding:[20,20]});
+    drawElevation(manualCoords.map(c=>c[2]||0),lls);
+    importedTrace=true; st.textContent='✅ Import OK';
+    setTimeout(()=>st.textContent='',2000);
+    showChartArea(true);
+  }catch(e){ console.error("Import:",e); st.textContent='Erreur import'; alert("Erreur : "+e.message); }
 }
+function triggerImport(){ document.getElementById('importFile').value=''; document.getElementById('importFile').click(); }
+document.getElementById('importFile').addEventListener('change',e=>{ const f=e.target.files&&e.target.files[0]; if(f) handleImport(f); });
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{ e.preventDefault(); if(e.dataTransfer&&e.dataTransfer.files.length) handleImport(e.dataTransfer.files[0]); });
 
-
-
-/* wire hidden file input + visible button */
-const importFileInput = document.getElementById('importFile');
-const openFileBtn = document.getElementById('openFileBtn');
-openFileBtn.addEventListener('click', () => {
-  // reset to allow re-import same file
-  importFileInput.value = '';
-  importFileInput.click();
-});
-// on change -> process file
-importFileInput.addEventListener('change', (evt) => {
-  const file = evt.target.files && evt.target.files[0];
-  if(file) handleFileImport(file);
-});
-
-/* optional: drag/drop for desktop */
-document.addEventListener('dragover', (e)=>{ e.preventDefault(); });
-document.addEventListener('drop', (e)=>{ e.preventDefault(); if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){ handleFileImport(e.dataTransfer.files[0]); } });
-
-/* --------------------- EXPORT GPX / GEOJSON --------------------- */
-function exportGeoJSON(){
-  if(!manualRouteCoords.length) return alert("Aucune trace à exporter");
-  const geo = { type:"FeatureCollection", features:[{ type:"Feature", geometry:{ type:"LineString", coordinates: manualRouteCoords.map(c=>[c[1],c[0],c[2]||0]) }, properties:{} }]};
-  const blob = new Blob([JSON.stringify(geo)],{ type:"application/json" });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "trace.geojson"; a.click();
-}
-
+/* ── EXPORT GPX ── */
 function exportGPX(){
-  if(manualRouteCoords.length < 2) return alert("Aucune trace complète à exporter");
-  if(typeof togpx !== "function"){
-    alert("La librairie d'export GPX (togpx) n'est pas encore chargée. Vérifiez votre connexion et rechargez la page.");
-    return;
-  }
-  const geo = { type:"FeatureCollection", features:[{ type:"Feature", geometry:{ type:"LineString", coordinates: manualRouteCoords.map(c=>[c[1],c[0],c[2]||0]) }, properties:{ name:"Trace complète ORS" } }]};
-  const gpx = togpx(geo);
-  const blob = new Blob([gpx], { type:"application/gpx+xml" });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "trace_complete.gpx"; a.click();
-
-  // injection IBP (conserve le comportement existant)
-  try {
-    const file = new File([blob],"trace_complete.gpx",{ type:"application/gpx+xml" });
-    const dt = new DataTransfer(); dt.items.add(file);
-    document.getElementById('ibpFile').files = dt.files;
-    document.getElementById('formuploadajax').dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
-    document.getElementById('obtain').innerHTML = "⏳ Calcul IBP en cours (GPX COMPLET envoyé)...";
-  } catch(err){ console.error("Erreur injection IBP:", err); }
+  if(manualCoords.length<2) return showToast("Aucune trace à exporter");
+  if(typeof togpx!=="function") return showToast("Lib togpx non chargée");
+  const geo={type:"FeatureCollection",features:[{type:"Feature",geometry:{type:"LineString",coordinates:manualCoords.map(c=>[c[1],c[0],c[2]||0])},properties:{name:"Trace ORS"}}]};
+  const gpx=togpx(geo);
+  const blob=new Blob([gpx],{type:"application/gpx+xml"});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download="trace_complete.gpx"; a.click();
+  try{ const f=new File([blob],"trace_complete.gpx",{type:"application/gpx+xml"}); const dt=new DataTransfer(); dt.items.add(f); document.getElementById('ibpFile').files=dt.files; document.getElementById('formuploadajax').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); document.getElementById('obtain').innerHTML="⏳ Calcul IBP…"; showChartArea(true); }catch(e){ console.error("IBP:",e); }
 }
+function computeIBP(){ if(manualCoords.length<2){ showToast("Pas de trace"); return; } exportGPX(); switchTab('map'); }
 
-/* --------------------- refresh / markers / édition --------------------- */
-function refreshMarkers(){
-  editPointsLayer.clearLayers();
-
-  manualPoints.forEach((p, idx) => {
-
-    const m = L.circleMarker(
-      [p[1], p[0]],
-      { radius:4, color:null, weight:0, fillColor:"#c7302a", fillOpacity:0.9 }
-    ).addTo(editPointsLayer);
-
-    m.on('contextmenu', () => {
-      manualPoints.splice(idx,1);
-      rebuildManualRouteFromPoints();
-      refreshMarkers();
-    });
-
-  });
-}
-
-
-function removeLastPoint(){ if(!manualPoints.length) return; manualPoints.pop(); rebuildManualRouteFromPoints(); refreshMarkers(); }
-function clearAll(){
-  manualPoints=[]; manualRouteCoords=[]; importedTrace=false; // FIX 8 — reset flag
-  routeLayer.clearLayers(); markers.clearLayers(); editableMarkers.clearLayers();editPointsLayer.clearLayers();
-  if(markerA){ straightLineLayer.removeLayer(markerA); markerA=null; A=null; }
-  if(markerB){ straightLineLayer.removeLayer(markerB); markerB=null; B=null; }
-  if(straightLine){ straightLineLayer.removeLayer(straightLine); straightLine=null; }
-  document.getElementById('distance').innerHTML = "";
-  if(elevationChart) elevationChart.destroy();
-  clearSavedRoute();
-}
-
-function createEditableMarkersFromCoords(latlngs){
-  editableMarkers.clearLayers();
-
-  latlngs.forEach((ll, idx) => {
-
-    // --- POINT EDITABLE VISUEL (dans la couche "Points manuels") ---
-    const mk = L.circleMarker([ll[0], ll[1]], {
-      radius:4,
-      color:null,
-      weight:0,
-      fillColor:"#2a66c7",
-      fillOpacity:1
-    }).addTo(markers);   // <-- IMPORTANT : dans markers, donc supprimable/masquable
-
-
-    // --- PROXY DRAG INVISIBLE (reste dans editableMarkers) ---
-    const proxy = L.marker([ll[0], ll[1]], {
-      opacity:0,
-      draggable:true
-    }).addTo(editableMarkers);
-
-    // sync visible point during drag
-    proxy.on('drag', (e) => {
-      mk.setLatLng(e.target.getLatLng());
-    });
-
-    // update route after drag end
-    proxy.on('dragend', (e) => {
-      const newLatLng = e.target.getLatLng();
-
-      // update the coords in the main route array
-      if (manualRouteCoords[idx]) {
-        manualRouteCoords[idx][0] = newLatLng.lat;
-        manualRouteCoords[idx][1] = newLatLng.lng;
-      }
-
-      // redraw polyline
-      routeLayer.clearLayers();
-      const latlngsNow = manualRouteCoords.map(c => [c[0], c[1]]);
-      L.polyline(latlngsNow, { color:"green", weight:4 }).addTo(routeLayer);
-
-      // redraw elevation profile
-      drawElevation(
-        manualRouteCoords.map(c => c[2] || 0),
-        latlngsNow
-      );
-
-      // save local
-      saveRouteLocal();
-    });
-
-  });
-}
-
-/* --------------------- RECORDING GPS --------------------- */
-let gpsTracking=false, recordedTrace=[];
-function toggleAutoRecording(){
-  gpsTracking = !gpsTracking;
-  const btn = document.getElementById('recBtn');
-  if(!btn) return;
-  if(gpsTracking){ recordedTrace=[]; btn.classList.add('recording'); btn.innerHTML='⏹️'; showTooltip("Enregistrement GPS démarré"); }
-  else {
-    btn.classList.remove('recording'); btn.innerHTML='▶️';
-    if(recordedTrace.length>2){
-      manualRouteCoords = recordedTrace.map(p=>[p.lat,p.lng,p.ele||0]);
-      routeLayer.clearLayers();
-      L.polyline(recordedTrace.map(p=>[p.lat,p.lng]),{color:"green",weight:4}).addTo(routeLayer);
-      createEditableMarkersFromCoords(recordedTrace.map(p=>[p.lat,p.lng]));
-      drawElevation(recordedTrace.map(p=>p.ele||0), recordedTrace.map(p=>[p.lat,p.lng]));
-      saveRouteLocal();
-    }
-    showTooltip("Enregistrement GPS arrêté");
-  }
-}
-/* watchPosition fusionné avec le suivi GPS principal — voir le premier watchPosition */
-
-/* --------------------- SEARCH (Nominatim) --------------------- */
-let searchMarkerGroup = L.layerGroup().addTo(map);
-async function searchLocation(){
-  const q = document.getElementById('searchInput').value.trim();
-  const resultsDiv = document.getElementById('searchResults');
-  if(!q){ resultsDiv.style.display='none'; resultsDiv.innerHTML=''; return alert("Entrez un nom de lieu"); }
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&addressdetails=1&accept-language=fr`;
-  try{
-    resultsDiv.style.display='block';
-    resultsDiv.innerHTML = '<div style="padding:10px;color:#666;font-size:13px;">🔎 Recherche...</div>';
-    const res = await fetch(url, { headers:{ 'Accept':'application/json' }});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json();
-    if(!data || !data.length){ resultsDiv.innerHTML = '<div style="padding:10px;color:#666;font-size:13px;">Aucun résultat.</div>'; return; }
-    resultsDiv.innerHTML = '';
-    data.forEach((place, idx) => {
-      const display = place.display_name || (place.name || 'Lieu inconnu');
-      const lat = parseFloat(place.lat), lon = parseFloat(place.lon);
-      const type = place.type || place.class || '';
-      const item = document.createElement('div');
-      item.className = 'result';
-      item.style.padding='8px';
-      item.style.borderBottom='1px solid rgba(0,0,0,0.06)';
-      item.innerHTML = `<div style="font-size:13px">${display}</div><div style="font-size:12px;color:#666">${type}</div>`;
-      item.onclick = () => {
-        map.setView([lat,lon], Math.max(13, place.zoom?+place.zoom:14));
-        searchMarkerGroup.clearLayers();
-        L.marker([lat,lon]).addTo(searchMarkerGroup).bindPopup(`<b>${display}</b>`).openPopup();
-        resultsDiv.style.display='none'; resultsDiv.innerHTML='';
-      };
-      resultsDiv.appendChild(item);
-    });
-    // center on first
-    const first = data[0];
-    if(first){ map.setView([parseFloat(first.lat), parseFloat(first.lon)], Math.max(13, first.zoom?+first.zoom:14)); searchMarkerGroup.clearLayers(); L.marker([parseFloat(first.lat), parseFloat(first.lon)]).addTo(searchMarkerGroup).bindPopup(first.display_name||'').openPopup(); }
-  } catch(err){
-    console.error("searchLocation error:", err);
-    resultsDiv.style.display='block';
-    resultsDiv.innerHTML = `<div style="padding:10px;color:#900;font-size:13px;">Erreur de recherche (${err.message})</div>`;
-  }
-}
-document.getElementById('searchInput').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); searchLocation(); } });
-map.on('click', () => { const resultsDiv=document.getElementById('searchResults'); if(resultsDiv){ resultsDiv.style.display='none'; resultsDiv.innerHTML=''; } });
-document.addEventListener('click', (e) => { const topBar=document.querySelector('.top-bar'); const resultsDiv=document.getElementById('searchResults'); if(!topBar.contains(e.target) && resultsDiv){ resultsDiv.style.display='none'; resultsDiv.innerHTML=''; } });
-
-/* --------------------- IMPORT/EXPORT IBP FORM SUBMIT (conserve comportement) --------------------- */
-$("#formuploadajax").on("submit", function(e){
+/* ── IBP ── */
+$("#formuploadajax").on("submit",function(e){
   e.preventDefault();
-  var formData = new FormData(this);
-  $.ajax({
-    url: "https://www.ibpindex.com/api/",
-    type: "post",
-    dataType: "json",
-    data: formData,
-    cache: false,
-    contentType: false,
-    processData: false
-  }).done(function(javascript_json){
-    try {
-      const ibpVal = javascript_json.hiking && javascript_json.hiking.ibp !== undefined
-        ? javascript_json.hiking.ibp
-        : null;
-
-      // FIX 6 — Stocker l'IBP dans la métadonnée locale et localStorage
-      if(ibpVal !== null){
-        try {
-          const stored = JSON.parse(localStorage.getItem("traceur_manual_route_v1") || "null");
-          if(stored){
-            localStorage.setItem("traceur_ibp_v1", JSON.stringify({ ibp: ibpVal, ts: Date.now() }));
-          }
-        } catch(e){ console.warn("IBP save fail:", e); }
-      }
-
-      let weobtain = `<h3>Résultat IBP HKG</h3><b>Référence :</b> ${javascript_json.reference}<br><b>Fichier :</b> ${javascript_json.filename}<br><br>🥾 <b>IBP Randonnée (HKG) :</b> <span style="font-size:22px;color:#2a66c7">${ibpVal ?? "—"}</span><br><br>⬆️ <b>Dénivelé cumulé :</b> ${javascript_json.hiking.accuclimb} m<br>⏱ <b>Temps arrêt :</b> ${javascript_json.hiking.totalstoptime} s`;
-      document.getElementById("obtain").innerHTML = weobtain;
-    } catch(err){
-      document.getElementById("obtain").innerHTML = "✅ Résultat reçu (format inattendu).";
-      console.error("IBP parse error:", err, javascript_json);
-    }
-  }).fail(function(){ document.getElementById("obtain").innerHTML = "❌ Erreur lors du calcul IBP."; });
+  $.ajax({url:"https://www.ibpindex.com/api/",type:"post",dataType:"json",data:new FormData(this),cache:false,contentType:false,processData:false})
+  .done(function(j){
+    try{
+      const v=j.hiking&&j.hiking.ibp!==undefined?j.hiking.ibp:null;
+      if(v!=null){ try{ if(localStorage.getItem(SKEY)) localStorage.setItem("traceur_ibp_v1",JSON.stringify({ibp:v,ts:Date.now()})); }catch(e){} document.getElementById('sp-ibp').textContent=v; }
+      document.getElementById("obtain").innerHTML=`<b>IBP:</b> ${v??"—"} &nbsp;D+ ${j.hiking.accuclimb} m`;
+    }catch(err){ document.getElementById("obtain").innerHTML="✅ Résultat reçu."; }
+  }).fail(()=>{ document.getElementById("obtain").innerHTML="❌ Erreur IBP."; });
 });
 
-/* --------------------- HELPERS: tooltip / toast --------------------- */
-function showTooltip(text, duration=1600){
-  const t = document.getElementById('mobileTooltip');
-  t.innerText = text;
-  t.style.display = 'block';
-  t.style.left = '50%';
-  t.style.transform = 'translateX(-50%)';
-  setTimeout(()=>{ t.style.display = 'none'; }, duration);
+/* ── MARKERS ── */
+function refreshPts(){
+  editPts.clearLayers();
+  manualPts.forEach((p,i)=>{
+    const m=L.circleMarker([p[1],p[0]],{radius:4,color:null,weight:0,fillColor:"#c7302a",fillOpacity:.9}).addTo(editPts);
+    m.on('contextmenu',()=>{ manualPts.splice(i,1); rebuildRoute(); refreshPts(); });
+  });
+}
+function removeLastPoint(){ if(!manualPts.length) return; manualPts.pop(); rebuildRoute(); refreshPts(); }
+function confirmClearAll(){ if(!manualCoords.length&&!manualPts.length){ showToast("Rien à effacer"); return; } if(!confirm("Effacer toute la trace ?")) return; clearAll(); }
+function clearAll(){
+  manualPts=[]; manualCoords=[]; importedTrace=false;
+  routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
+  if(mA){ slLayer.removeLayer(mA); mA=null; A=null; } if(mB){ slLayer.removeLayer(mB); mB=null; B=null; } if(sl){ slLayer.removeLayer(sl); sl=null; }
+  ['stat-dist','stat-dp','stat-dm','sp-dist','sp-dp','sp-dm','sp-ibp'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('distance').innerHTML='';
+  if(chart1){ chart1.destroy(); chart1=null; } if(chart2){ chart2.destroy(); chart2=null; }
+  showChartArea(false); clearLocal();
+}
+function mkEditable(lls){
+  editMarkers.clearLayers();
+  lls.forEach((ll,i)=>{
+    const mk=L.circleMarker([ll[0],ll[1]],{radius:4,color:null,weight:0,fillColor:"#2a66c7",fillOpacity:1}).addTo(markers);
+    const px=L.marker([ll[0],ll[1]],{opacity:0,draggable:true}).addTo(editMarkers);
+    px.on('drag',e=>mk.setLatLng(e.target.getLatLng()));
+    px.on('dragend',e=>{
+      const n=e.target.getLatLng();
+      if(manualCoords[i]){ manualCoords[i][0]=n.lat; manualCoords[i][1]=n.lng; }
+      routeLayer.clearLayers();
+      const lls2=manualCoords.map(c=>[c[0],c[1]]);
+      L.polyline(lls2,{color:"#52b788",weight:4}).addTo(routeLayer);
+      drawElevation(manualCoords.map(c=>c[2]||0),lls2); saveLocal();
+    });
+  });
 }
 
-/* --------------------- SAVE / LOAD ROUTE (localStorage) --------------------- */
-const STORAGE_KEY = "traceur_manual_route_v1";
-function saveRouteLocal(){
-  try{
-    if(!manualRouteCoords || !manualRouteCoords.length){ localStorage.removeItem(STORAGE_KEY); return; }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(manualRouteCoords));
-  } catch(e){ console.warn("saveRouteLocal fail:",e); }
-}
-function loadRouteLocal(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return false;
-    manualRouteCoords = JSON.parse(raw);
-    if(!manualRouteCoords || !manualRouteCoords.length) return false;
-    const latlngs = manualRouteCoords.map(c=>[c[0],c[1]]);
-    routeLayer.clearLayers();
-    L.polyline(latlngs, { color:"green", weight:4 }).addTo(routeLayer);
-    createEditableMarkersFromCoords(latlngs);
-    drawElevation(manualRouteCoords.map(c=>c[2]||0), latlngs);
-    map.fitBounds(latlngs, { padding:[20,20] });
-    return true;
-  } catch(e){ console.warn("loadRouteLocal fail:",e); return false; }
-}
-function clearSavedRoute(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
-
-/* --------------------- CENTER GPS --------------------- */
-function centerGPS(){ if(gpsMarker) map.setView(gpsMarker.getLatLng(),14); }
-
-/* --------------------- UI small functions --------------------- */
-function toggleInfoPanel(){
-  const panel = document.querySelector('.container');
-  if(!panel) return;
-  panel.classList.toggle('open');
-  panel.classList.toggle('closed');
-}
-function closeStartupPopup(){ document.getElementById('startupPopup').style.display = 'none'; }
-
-/* --------------------- INIT on load --------------------- */
-window.addEventListener('load', () => {
-  // show startup
-  document.getElementById("startupPopup").style.display = "flex";
-  // try to restore previously saved trace
-  if(loadRouteLocal()){ showTooltip("Trace restaurée depuis la session précédente"); }
-  console.log("Traceur chargé (version rev).");
-
-  // FIX 1 — Enregistrement du Service Worker (PWA hors-ligne + installation mobile)
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log("SW enregistré, scope:", reg.scope))
-      .catch(err => console.warn("SW échec:", err));
+/* ── RECORDING ── */
+function toggleAutoRecording(){
+  gpsTracking=!gpsTracking;
+  const btn=document.getElementById('tab-rec');
+  if(gpsTracking){ recTrace=[]; btn.classList.add('recording'); btn.querySelector('.tab-icon').textContent='⏹️'; showToast("Enregistrement démarré"); }
+  else{
+    btn.classList.remove('recording'); btn.querySelector('.tab-icon').textContent='⏺️';
+    if(recTrace.length>2){
+      manualCoords=recTrace.map(p=>[p.lat,p.lng,p.ele||0]);
+      routeLayer.clearLayers();
+      L.polyline(recTrace.map(p=>[p.lat,p.lng]),{color:"#52b788",weight:4}).addTo(routeLayer);
+      mkEditable(recTrace.map(p=>[p.lat,p.lng]));
+      drawElevation(recTrace.map(p=>p.ele||0),recTrace.map(p=>[p.lat,p.lng]));
+      saveLocal(); showChartArea(true);
+    }
+    showToast("Enregistrement arrêté");
   }
-});
+}
 
-/* ==== DOCK AMOVIBLE (SWIPE DOWN) — FIX LEAFLET MOBILE ==== */
-(function enableDockSwipe(){
+/* ── RECHERCHE ── */
+async function searchLocation(){
+  const q=document.getElementById('searchInput').value.trim();
+  const rd=document.getElementById('searchResults');
+  if(!q){ rd.style.display='none'; return; }
+  rd.style.display='block';
+  rd.innerHTML='<div class="search-item"><div class="sname">🔎 Recherche…</div></div>';
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&addressdetails=1&accept-language=fr`,{headers:{'Accept':'application/json'}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    if(!data.length){ rd.innerHTML='<div class="search-item"><div class="sname">Aucun résultat</div></div>'; return; }
+    rd.innerHTML='';
+    data.forEach(pl=>{
+      const nm=pl.display_name||(pl.name||'Lieu inconnu');
+      const lat=parseFloat(pl.lat),lng=parseFloat(pl.lon);
+      const el=document.createElement('div'); el.className='search-item';
+      el.innerHTML=`<div class="sname">${nm}</div><div class="stype">${pl.type||''}</div>`;
+      el.onclick=()=>{ map.setView([lat,lng],Math.max(13,pl.zoom?+pl.zoom:14)); searchGrp.clearLayers(); L.marker([lat,lng]).addTo(searchGrp).bindPopup(`<b>${nm}</b>`).openPopup(); rd.style.display='none'; };
+      rd.appendChild(el);
+    });
+    const f=data[0]; if(f) map.setView([parseFloat(f.lat),parseFloat(f.lon)],Math.max(13,f.zoom?+f.zoom:14));
+  }catch(e){ rd.innerHTML=`<div class="search-item"><div class="sname" style="color:#e53e3e">Erreur: ${e.message}</div></div>`; }
+}
+document.getElementById('searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); searchLocation(); } });
+document.addEventListener('click',e=>{ if(!document.getElementById('app-header').contains(e.target)) document.getElementById('searchResults').style.display='none'; });
 
-  const dock = document.querySelector('.leaflet-control.custom-panel');
-  if(!dock) return;
+/* ── COUCHES ── */
+function switchLayer(n){
+  if(n==='osm'){ if(curBase!=='osm'){ map.removeLayer(tfLayer); osmLayer.addTo(map); curBase='osm'; } }
+  else          { if(curBase!=='tf') { map.removeLayer(osmLayer); tfLayer.addTo(map);  curBase='tf';  } }
+  document.getElementById('layer-osm').classList.toggle('active',n==='osm');
+  document.getElementById('layer-tf').classList.toggle('active', n==='tf');
+}
+function toggleOverlay(n){
+  ovState[n]=!ovState[n];
+  if(n==='hiking'){ ovState.hiking?hikingOv.addTo(map):map.removeLayer(hikingOv); document.getElementById('ov-hiking').textContent=ovState.hiking?'●':'○'; }
+  if(n==='route') { ovState.route?routeLayer.addTo(map):map.removeLayer(routeLayer); document.getElementById('ov-route').textContent=ovState.route?'●':'○'; }
+  if(n==='markers'){ovState.markers?markers.addTo(map):map.removeLayer(markers); document.getElementById('ov-markers').textContent=ovState.markers?'●':'○'; }
+}
 
-  const handle = dock.querySelector('.icon-grid');
-  if(!handle) return;
+/* ── TABS ── */
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.side-panel').forEach(p=>p.classList.remove('visible'));
+  if(n==='map')     document.getElementById('tab-map').classList.add('active');
+  if(n==='stats')   { document.getElementById('tab-stats').classList.add('active');   document.getElementById('stats-panel').classList.add('visible'); }
+  if(n==='options') { document.getElementById('tab-options').classList.add('active'); document.getElementById('options-panel').classList.add('visible'); }
+}
 
-  let startY = 0;
-  let deltaY = 0;
-
-  handle.addEventListener('touchstart', e => {
-    if(e.touches.length !== 1) return;
-    startY = e.touches[0].clientY;
-    deltaY = 0;
-    e.stopPropagation();
-  }, { passive:true });
-
-  handle.addEventListener('touchmove', e => {
-    if(!startY) return;
-    deltaY = e.touches[0].clientY - startY;
-    e.stopPropagation();
-  }, { passive:true });
-
-  handle.addEventListener('touchend', e => {
-    if(Math.abs(deltaY) < 30) return;
-
-    if(deltaY > 0){
-      dock.classList.add('closed');   // swipe down
-    } else {
-      dock.classList.remove('closed'); // swipe up
-    }
-
-    startY = 0;
-    deltaY = 0;
-    e.stopPropagation();
+/* ── BOTTOM SHEET ── */
+(function(){
+  const sh=document.getElementById('bottom-sheet');
+  const hw=document.getElementById('sheet-handle-wrap');
+  let sy=0,dragging=false;
+  hw.addEventListener('click',()=>{ sh.classList.toggle('collapsed'); sh.classList.toggle('expanded'); });
+  hw.addEventListener('touchstart',e=>{ sy=e.touches[0].clientY; dragging=true; sh.style.transition='none'; },{passive:true});
+  document.addEventListener('touchmove',e=>{ if(!dragging) return; const dy=e.touches[0].clientY-sy; const cur=new DOMMatrix(getComputedStyle(sh).transform).m42; sh.style.transform=`translateY(${Math.max(0,cur+dy-sy)}px)`; sy=e.touches[0].clientY; },{passive:true});
+  document.addEventListener('touchend',()=>{
+    if(!dragging) return; dragging=false; sh.style.transition='';
+    const ty=new DOMMatrix(getComputedStyle(sh).transform).m42;
+    if(ty>sh.offsetHeight*.3){ sh.classList.add('collapsed'); sh.classList.remove('expanded'); }
+    else{ sh.classList.remove('collapsed'); sh.classList.add('expanded'); }
+    sh.style.transform='';
   });
-
 })();
 
-document.querySelector('.dock-handle')?.addEventListener('click', () => {
-  document.querySelector('.leaflet-control.custom-panel')?.classList.toggle('closed');
+function showChartArea(v){
+  document.getElementById('sheet-chart-area').classList.toggle('visible',v);
+  document.getElementById('btn-chart').classList.toggle('is-active',v);
+  if(v){ const sh=document.getElementById('bottom-sheet'); sh.classList.remove('collapsed'); sh.classList.add('expanded'); }
+}
+function toggleChartArea(){ showChartArea(!document.getElementById('sheet-chart-area').classList.contains('visible')); }
+
+/* ── STORAGE ── */
+function saveLocal(){ try{ if(!manualCoords.length){ localStorage.removeItem(SKEY); return; } localStorage.setItem(SKEY,JSON.stringify(manualCoords)); }catch(e){} }
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem(SKEY); if(!raw) return false;
+    manualCoords=JSON.parse(raw); if(!manualCoords.length) return false;
+    const lls=manualCoords.map(c=>[c[0],c[1]]);
+    L.polyline(lls,{color:"#52b788",weight:4}).addTo(routeLayer);
+    mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+    map.fitBounds(lls,{padding:[20,20]}); return true;
+  }catch(e){ return false; }
+}
+function clearLocal(){ try{ localStorage.removeItem(SKEY); }catch(e){} }
+
+/* ── TOAST ── */
+let toastTimer;
+function showToast(txt,dur=2200){
+  const t=document.getElementById('toast'); t.textContent=txt; t.style.display='block';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display='none',dur);
+}
+function showTooltip(t,d){ showToast(t,d); }
+
+/* ── INIT ── */
+function closeStartupPopup(){ document.getElementById('startupPopup').style.display='none'; }
+window.addEventListener('load',()=>{
+  document.getElementById('startupPopup').style.display='flex';
+  if(loadLocal()){ showToast("Trace restaurée"); showChartArea(true); }
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(r=>console.log("SW",r.scope)).catch(e=>console.warn("SW:",e));
+  setTimeout(()=>map.invalidateSize(),300);
 });
-(function enableInfoHandle(){
-  const panel = document.querySelector('.container');
-  const handle = document.querySelector('.info-handle');
-  if(!panel || !handle) return;
-
-  // état initial
-  panel.classList.add('closed');
-
-  handle.addEventListener('click', () => {
-    panel.classList.toggle('open');
-    panel.classList.toggle('closed');
-  });
-})();
-
-
 </script>
-
 </body>
 </html>
