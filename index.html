@@ -237,8 +237,8 @@ style="display:none;"
 
   <div id="searchResults"></div>
 
-  <!-- info panel -->
-  <div class="container" aria-live="polite">
+  <!-- info panel (démarre fermé via class HTML, pas seulement JS) -->
+  <div class="container closed" aria-live="polite">
     <!-- POIGNÉE DU PANNEAU INFOS (À AJOUTER ICI) -->
   <div class="info-handle" aria-label="Ouvrir / fermer les infos"></div>
 
@@ -256,6 +256,9 @@ style="display:none;"
 
 <script>
 /* --------------------- CONFIG / CONST --------------------- */
+/* ⚠️  CLÉ API — ne pas versionner en clair sur un dépôt public.
+   Idéalement : stocker dans un proxy serveur ou une variable d'env.
+   Valeur actuelle conservée pour compatibilité — à remplacer côté serveur. */
 const ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0=";
 const ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
 /* -------- ALTITUDE ORS (cache + throttle) -------- */
@@ -376,6 +379,9 @@ if(navigator.geolocation){
 
     // --- stocker altitude ---
     gpsMarker._altitude = alt;
+
+    // --- enregistrement de trace (fusionné ici, était un second watchPosition) ---
+    if(gpsTracking) recordedTrace.push({ lat, lng, ele: alt || 0 });
 
     // --- handler click (une seule fois) ---
     if(!gpsClickAttached){
@@ -527,10 +533,21 @@ async function rebuildManualRouteFromPoints(){
 }
 
 /* --------------------- MAP CLICK POUR AJOUTER POINTS --------------------- */
-map.on('click', e => {
+// FIX 8 — flag pour savoir si une trace importée est active
+let importedTrace = false;
 
+map.on('click', e => {
   // 🔒 Si on est en mode A/B → PAS de tracé ORS
   if(modeAB) return;
+
+  // FIX 8 — Si une trace GPX est importée, demander confirmation avant d'écraser
+  if(importedTrace){
+    if(!confirm("Une trace GPX est déjà chargée.\nCliquer sur la carte va démarrer un nouveau tracé ORS et effacer la trace importée. Continuer ?")) return;
+    importedTrace = false;
+    manualRouteCoords = [];
+    routeLayer.clearLayers();
+    editableMarkers.clearLayers();
+  }
 
   manualPoints.push([e.latlng.lng, e.latlng.lat]);
   rebuildManualRouteFromPoints();
@@ -539,29 +556,31 @@ map.on('click', e => {
 
 /* --------------------- A/B déplaçable / Ligne droite --------------------- */
 function setPointA(){
-  modeAB = true;   // ← AJOUT
+  modeAB = true;
+  showTooltip("Cliquez sur la carte pour placer le point A");
   map.once('click', e => {
     A = e.latlng;
     if(markerA) straightLineLayer.removeLayer(markerA);
     markerA = L.marker(A).addTo(straightLineLayer).bindPopup("A").openPopup();
+    modeAB = false;
   });
 }
 
 function setPointB(){
-  modeAB = true;   // ← AJOUT
+  modeAB = true;
+  showTooltip("Cliquez sur la carte pour placer le point B");
   map.once('click', e => {
     B = e.latlng;
     if(markerB) straightLineLayer.removeLayer(markerB);
     markerB = L.marker(B, { draggable: true })
-  .addTo(straightLineLayer)
-  .bindPopup("B")
-  .openPopup();
-
-markerB.on('drag', () => {
-  B = markerB.getLatLng();
-  updateStraightLine();
-});
-
+      .addTo(straightLineLayer)
+      .bindPopup("B")
+      .openPopup();
+    markerB.on('drag', () => {
+      B = markerB.getLatLng();
+      updateStraightLine();
+    });
+    modeAB = false;
   });
 }
 
@@ -590,25 +609,9 @@ function drawStraightLine(){
   // ⬇️ ICI, À LA FIN DE LA FONCTION
   modeAB = false;
 
-  // Calcul distance
+  // Calcul distance et label via updateStraightLine (évite distKm non déclaré)
   updateStraightLine();
 
-  // Position du label = milieu du segment
-  const midLat = (A.lat + B.lat) / 2;
-  const midLng = (A.lng + B.lng) / 2;
-
-  // Label distance SUR LA CARTE
-  L.marker([midLat, midLng], {
-    icon: L.divIcon({
-      className: "distance-label",
-      html: `📏 ${distKm} km`,
-      iconSize: [80, 24]
-    }),
-    interactive: false
-  }).addTo(straightLineLayer);
-
-  
-    
 }
 /* --------------------- Mise à jour dynamique de la ligne --------------------- */
 function updateStraightLine(){
@@ -787,6 +790,7 @@ async function handleFileImport(file){
 
     manualPoints = [];
 
+    importedTrace = true; // FIX 8 — trace importée active
     statusEl.textContent = 'Import OK';
     setTimeout(()=> statusEl.textContent = '', 1800);
 
@@ -827,6 +831,10 @@ function exportGeoJSON(){
 
 function exportGPX(){
   if(manualRouteCoords.length < 2) return alert("Aucune trace complète à exporter");
+  if(typeof togpx !== "function"){
+    alert("La librairie d'export GPX (togpx) n'est pas encore chargée. Vérifiez votre connexion et rechargez la page.");
+    return;
+  }
   const geo = { type:"FeatureCollection", features:[{ type:"Feature", geometry:{ type:"LineString", coordinates: manualRouteCoords.map(c=>[c[1],c[0],c[2]||0]) }, properties:{ name:"Trace complète ORS" } }]};
   const gpx = togpx(geo);
   const blob = new Blob([gpx], { type:"application/gpx+xml" });
@@ -865,7 +873,8 @@ function refreshMarkers(){
 
 function removeLastPoint(){ if(!manualPoints.length) return; manualPoints.pop(); rebuildManualRouteFromPoints(); refreshMarkers(); }
 function clearAll(){
-  manualPoints=[]; manualRouteCoords=[]; routeLayer.clearLayers(); markers.clearLayers(); editableMarkers.clearLayers();editPointsLayer.clearLayers();   // ← AJOUT ICI
+  manualPoints=[]; manualRouteCoords=[]; importedTrace=false; // FIX 8 — reset flag
+  routeLayer.clearLayers(); markers.clearLayers(); editableMarkers.clearLayers();editPointsLayer.clearLayers();
   if(markerA){ straightLineLayer.removeLayer(markerA); markerA=null; A=null; }
   if(markerB){ straightLineLayer.removeLayer(markerB); markerB=null; B=null; }
   if(straightLine){ straightLineLayer.removeLayer(straightLine); straightLine=null; }
@@ -948,11 +957,7 @@ function toggleAutoRecording(){
     showTooltip("Enregistrement GPS arrêté");
   }
 }
-if(navigator.geolocation){
-  navigator.geolocation.watchPosition(p=>{
-    if(gpsTracking) recordedTrace.push({ lat:p.coords.latitude, lng:p.coords.longitude, ele:p.coords.altitude||0 });
-  }, err=>{}, { enableHighAccuracy:true });
-}
+/* watchPosition fusionné avec le suivi GPS principal — voir le premier watchPosition */
 
 /* --------------------- SEARCH (Nominatim) --------------------- */
 let searchMarkerGroup = L.layerGroup().addTo(map);
@@ -1013,7 +1018,21 @@ $("#formuploadajax").on("submit", function(e){
     processData: false
   }).done(function(javascript_json){
     try {
-      let weobtain = `<h3>Résultat IBP HKG</h3><b>Référence :</b> ${javascript_json.reference}<br><b>Fichier :</b> ${javascript_json.filename}<br><br>🥾 <b>IBP Randonnée (HKG) :</b> <span style="font-size:22px;color:${'#2a66c7'}">${javascript_json.hiking.ibp}</span><br><br>⬆️ <b>Dénivelé cumulé :</b> ${javascript_json.hiking.accuclimb} m<br>⏱ <b>Temps arrêt :</b> ${javascript_json.hiking.totalstoptime} s`;
+      const ibpVal = javascript_json.hiking && javascript_json.hiking.ibp !== undefined
+        ? javascript_json.hiking.ibp
+        : null;
+
+      // FIX 6 — Stocker l'IBP dans la métadonnée locale et localStorage
+      if(ibpVal !== null){
+        try {
+          const stored = JSON.parse(localStorage.getItem("traceur_manual_route_v1") || "null");
+          if(stored){
+            localStorage.setItem("traceur_ibp_v1", JSON.stringify({ ibp: ibpVal, ts: Date.now() }));
+          }
+        } catch(e){ console.warn("IBP save fail:", e); }
+      }
+
+      let weobtain = `<h3>Résultat IBP HKG</h3><b>Référence :</b> ${javascript_json.reference}<br><b>Fichier :</b> ${javascript_json.filename}<br><br>🥾 <b>IBP Randonnée (HKG) :</b> <span style="font-size:22px;color:#2a66c7">${ibpVal ?? "—"}</span><br><br>⬆️ <b>Dénivelé cumulé :</b> ${javascript_json.hiking.accuclimb} m<br>⏱ <b>Temps arrêt :</b> ${javascript_json.hiking.totalstoptime} s`;
       document.getElementById("obtain").innerHTML = weobtain;
     } catch(err){
       document.getElementById("obtain").innerHTML = "✅ Résultat reçu (format inattendu).";
@@ -1076,6 +1095,13 @@ window.addEventListener('load', () => {
   // try to restore previously saved trace
   if(loadRouteLocal()){ showTooltip("Trace restaurée depuis la session précédente"); }
   console.log("Traceur chargé (version rev).");
+
+  // FIX 1 — Enregistrement du Service Worker (PWA hors-ligne + installation mobile)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log("SW enregistré, scope:", reg.scope))
+      .catch(err => console.warn("SW échec:", err));
+  }
 });
 
 /* ==== DOCK AMOVIBLE (SWIPE DOWN) — FIX LEAFLET MOBILE ==== */
