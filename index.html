@@ -211,7 +211,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 }
 .leaflet-container { touch-action: pan-x pan-y; }
 .leaflet-control-zoom { border-radius: 10px !important; }
-#importFile, #formuploadajax { display: none; }
+#importFile { display: none; }
 </style>
 </head>
 <body>
@@ -236,7 +236,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   <div class="sheet-peek">
     Dist&nbsp;<b id="stat-dist">—</b>&nbsp;km &nbsp;
     D+&nbsp;<b id="stat-dp">—</b>&nbsp;m &nbsp;
-    D-&nbsp;<b id="stat-dm">—</b>&nbsp;m
+    D-&nbsp;<b id="stat-dm">—</b>&nbsp;m &nbsp;
+    IBP&nbsp;<b id="stat-ibp">—</b>
   </div>
   <div class="sheet-actions">
     <button class="act-btn primary" onclick="exportGPX()">
@@ -318,10 +319,10 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   </div>
   <div class="opt-section">
     <h3>IBP</h3>
-    <div class="opt-row" onclick="computeIBP()">
+    <div class="opt-row" id="ibp-row" onclick="computeIBP()">
       <span class="opt-icon">🧮</span>
-      <div class="opt-text"><div class="opt-label">Calculer l'IBP</div><div class="opt-desc">Via ibpindex.com</div></div>
-      <span class="opt-arrow">›</span>
+      <div class="opt-text"><div class="opt-label">Calculer l'IBP</div><div class="opt-desc" id="ibp-desc">Via ibpindex.com — sans téléchargement</div></div>
+      <span class="opt-arrow" id="ibp-arrow">›</span>
     </div>
   </div>
 </div>
@@ -353,11 +354,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 </div>
 
 <input type="file" id="importFile" accept=".gpx,application/gpx+xml,application/xml,text/xml">
-<form id="formuploadajax" enctype="multipart/form-data">
-  <input type="hidden" name="key" value="ifwh7wlwykzixzxcg6rb">
-  <input type="hidden" name="type" value="hiking">
-  <input type="file" id="ibpFile" name="file" accept=".gpx">
-</form>
+
 <div id="toast"></div>
 
 <script>
@@ -561,22 +558,81 @@ function exportGPX(){
   const gpx=togpx(geo);
   const blob=new Blob([gpx],{type:"application/gpx+xml"});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download="trace_complete.gpx"; a.click();
-  try{ const f=new File([blob],"trace_complete.gpx",{type:"application/gpx+xml"}); const dt=new DataTransfer(); dt.items.add(f); document.getElementById('ibpFile').files=dt.files; document.getElementById('formuploadajax').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); document.getElementById('obtain').innerHTML="⏳ Calcul IBP…"; showChartArea(true); }catch(e){ console.error("IBP:",e); }
+  showChartArea(true);
 }
-function computeIBP(){ if(manualCoords.length<2){ showToast("Pas de trace"); return; } exportGPX(); switchTab('map'); }
+/* ── IBP SILENCIEUX (GPX en mémoire → API ibpindex, sans téléchargement) ── */
+async function computeIBP(){
+  if(manualCoords.length < 2){ showToast("Pas de trace à analyser"); return; }
+  if(typeof togpx !== "function"){ showToast("Lib togpx non chargée — vérifiez la connexion"); return; }
 
-/* ── IBP ── */
-$("#formuploadajax").on("submit",function(e){
-  e.preventDefault();
-  $.ajax({url:"https://www.ibpindex.com/api/",type:"post",dataType:"json",data:new FormData(this),cache:false,contentType:false,processData:false})
-  .done(function(j){
-    try{
-      const v=j.hiking&&j.hiking.ibp!==undefined?j.hiking.ibp:null;
-      if(v!=null){ try{ if(localStorage.getItem(SKEY)) localStorage.setItem("traceur_ibp_v1",JSON.stringify({ibp:v,ts:Date.now()})); }catch(e){} document.getElementById('sp-ibp').textContent=v; }
-      document.getElementById("obtain").innerHTML=`<b>IBP:</b> ${v??"—"} &nbsp;D+ ${j.hiking.accuclimb} m`;
-    }catch(err){ document.getElementById("obtain").innerHTML="✅ Résultat reçu."; }
-  }).fail(()=>{ document.getElementById("obtain").innerHTML="❌ Erreur IBP."; });
-});
+  // UI : état "en cours"
+  const arrow  = document.getElementById('ibp-arrow');
+  const desc   = document.getElementById('ibp-desc');
+  const obtain = document.getElementById('obtain');
+  if(arrow) arrow.textContent = '⏳';
+  if(desc)  desc.textContent  = 'Calcul en cours…';
+  if(obtain) obtain.innerHTML = '⏳ Calcul IBP en cours…';
+  showToast("Calcul IBP en cours…", 4000);
+  showChartArea(true);
+
+  try{
+    // Génération GPX en mémoire depuis manualCoords
+    const geo = {
+      type: "FeatureCollection",
+      features: [{ type:"Feature",
+        geometry:{ type:"LineString", coordinates: manualCoords.map(c=>[c[1],c[0],c[2]||0]) },
+        properties:{ name:"Trace IBP" }
+      }]
+    };
+    const gpxStr = togpx(geo);
+    const gpxBlob = new Blob([gpxStr], { type:"application/gpx+xml" });
+    const gpxFile = new File([gpxBlob], "trace.gpx", { type:"application/gpx+xml" });
+
+    // Construction du FormData
+    const fd = new FormData();
+    fd.append("key",  "ifwh7wlwykzixzxcg6rb");
+    fd.append("type", "hiking");
+    fd.append("file", gpxFile, "trace.gpx");
+
+    // Envoi silencieux
+    const res = await fetch("https://www.ibpindex.com/api/", {
+      method: "POST",
+      body: fd
+    });
+
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json();
+
+    const v   = j.hiking && j.hiking.ibp !== undefined ? j.hiking.ibp : null;
+    const dpl = j.hiking && j.hiking.accuclimb ? j.hiking.accuclimb : "—";
+
+    // Mise à jour UI
+    if(v !== null){
+      document.getElementById('sp-ibp').textContent = v;
+      document.getElementById('stat-ibp').textContent = v;
+      try{
+        if(localStorage.getItem(SKEY))
+          localStorage.setItem("traceur_ibp_v1", JSON.stringify({ ibp:v, ts:Date.now() }));
+      }catch(e){}
+    }
+
+    if(obtain) obtain.innerHTML =
+      `<b>IBP :</b> <span style="font-size:18px;color:#52b788">${v ?? "—"}</span>` +
+      ` &nbsp; D+ accumulé : ${dpl} m` +
+      (j.hiking && j.hiking.totalstoptime ? ` &nbsp; Temps arrêt : ${j.hiking.totalstoptime} s` : "");
+
+    if(arrow) arrow.textContent = '✅';
+    if(desc)  desc.textContent  = `IBP = ${v ?? "—"}`;
+    showToast(`IBP calculé : ${v ?? "—"}`, 3000);
+
+  } catch(err){
+    console.error("IBP silencieux:", err);
+    if(obtain) obtain.innerHTML = "❌ Erreur IBP : " + err.message;
+    if(arrow) arrow.textContent = '❌';
+    if(desc)  desc.textContent  = "Erreur — vérifiez la connexion";
+    showToast("Erreur calcul IBP", 3000);
+  }
+}
 
 /* ── MARKERS ── */
 function refreshPts(){
@@ -592,7 +648,7 @@ function clearAll(){
   manualPts=[]; manualCoords=[]; importedTrace=false;
   routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
   if(mA){ slLayer.removeLayer(mA); mA=null; A=null; } if(mB){ slLayer.removeLayer(mB); mB=null; B=null; } if(sl){ slLayer.removeLayer(sl); sl=null; }
-  ['stat-dist','stat-dp','stat-dm','sp-dist','sp-dp','sp-dm','sp-ibp'].forEach(id=>document.getElementById(id).textContent='—');
+  ['stat-dist','stat-dp','stat-dm','sp-dist','sp-dp','sp-dm','sp-ibp','stat-ibp'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='—'; });
   document.getElementById('distance').innerHTML='';
   if(chart1){ chart1.destroy(); chart1=null; } if(chart2){ chart2.destroy(); chart2=null; }
   showChartArea(false); clearLocal();
