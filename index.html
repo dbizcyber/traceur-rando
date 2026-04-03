@@ -210,6 +210,17 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   font-size: 12px; font-weight: 700; color: #b30000; white-space: nowrap;
 }
 .leaflet-container { touch-action: pan-x pan-y; }
+.sl-label {
+  background: rgba(229,62,62,.9) !important;
+  border: none !important;
+  border-radius: 4px !important;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+.sl-label::before { display:none !important; }
 .leaflet-control-zoom { border-radius: 10px !important; }
 #importFile { display: none; }
 </style>
@@ -246,14 +257,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
     <button class="act-btn" onclick="triggerImport()">
       <span class="act-icon">📂</span><span class="act-label">Importer GPX</span>
     </button>
-    <button class="act-btn" id="btn-a" onclick="setPointA()">
-      <span class="act-icon">🅰️</span><span class="act-label">Point A</span>
-    </button>
-    <button class="act-btn" id="btn-b" onclick="setPointB()">
-      <span class="act-icon">🅱️</span><span class="act-label">Point B</span>
-    </button>
-    <button class="act-btn" onclick="drawStraightLine()">
-      <span class="act-icon">📏</span><span class="act-label">Ligne A→B</span>
+    <button class="act-btn" id="btn-ligne" onclick="startLigneDroite()">
+      <span class="act-icon">📏</span><span class="act-label" id="btn-ligne-label">Ligne droite</span>
     </button>
     <button class="act-btn" onclick="removeLastPoint()">
       <span class="act-icon">↩️</span><span class="act-label">Annuler pt</span>
@@ -483,38 +488,82 @@ map.on('click',e=>{
 map.on('click',()=>{ document.getElementById('searchResults').style.display='none'; });
 
 /* ── POINTS A/B ── */
-function setPointA(){
-  modeAB=true; document.getElementById('btn-a').classList.add('is-active');
-  showToast("Tapez sur la carte pour placer A");
-  map.once('click',e=>{
-    A=e.latlng; if(mA) slLayer.removeLayer(mA);
-    mA=L.marker(A).addTo(slLayer).bindPopup("A").openPopup();
-    modeAB=false; document.getElementById('btn-a').classList.remove('is-active');
-  });
+/* ── LIGNE DROITE — 2 taps séquentiels ── */
+function startLigneDroite(){
+  /* Si déjà en mode placement : annuler */
+  if(modeAB){
+    modeAB=false;
+    map.off('click', _ligneHandler);
+    setBtnLigne('idle');
+    showToast("Ligne droite annulée");
+    return;
+  }
+  /* Nettoyer ancien tracé */
+  slLayer.clearLayers(); A=null; B=null; mA=null; mB=null; sl=null;
+  modeAB=true;
+  setBtnLigne('A');
+  showToast("Tapez le 1er point (A)");
+  map.once('click', _ligneHandlerA);
 }
-function setPointB(){
-  modeAB=true; document.getElementById('btn-b').classList.add('is-active');
-  showToast("Tapez sur la carte pour placer B");
-  map.once('click',e=>{
-    B=e.latlng; if(mB) slLayer.removeLayer(mB);
-    mB=L.marker(B,{draggable:true}).addTo(slLayer).bindPopup("B").openPopup();
-    mB.on('drag',()=>{ B=mB.getLatLng(); updateSL(); });
-    modeAB=false; document.getElementById('btn-b').classList.remove('is-active');
-  });
+
+function _ligneHandlerA(e){
+  A=e.latlng;
+  mA=L.marker(A,{ title:"A" })
+    .addTo(slLayer)
+    .bindTooltip("A",{permanent:true,direction:'top',offset:[0,-10],className:'sl-label'})
+    .openTooltip();
+  setBtnLigne('B');
+  showToast("Tapez le 2ème point (B)");
+  map.once('click', _ligneHandlerB);
 }
-function drawStraightLine(){
-  if(!A||!B){ showToast("Définissez A et B d'abord"); return; }
-  if(sl) slLayer.removeLayer(sl);
-  sl=L.polyline([[A.lat,A.lng],[B.lat,B.lng]],{color:"red",weight:3,dashArray:"6,6"}).addTo(slLayer);
-  map.fitBounds([[A.lat,A.lng],[B.lat,B.lng]],{padding:[40,40]});
-  modeAB=false; updateSL();
+
+function _ligneHandlerB(e){
+  B=e.latlng;
+  mB=L.marker(B,{ draggable:true, title:"B" })
+    .addTo(slLayer)
+    .bindTooltip("B",{permanent:true,direction:'top',offset:[0,-10],className:'sl-label'})
+    .openTooltip();
+  mB.on('drag',()=>{ B=mB.getLatLng(); updateSL(); });
+  /* Tracer la ligne immédiatement */
+  sl=L.polyline([[A.lat,A.lng],[B.lat,B.lng]],{color:"#e53e3e",weight:3,dashArray:"7,5"}).addTo(slLayer);
+  map.fitBounds([[A.lat,A.lng],[B.lat,B.lng]],{padding:[50,50]});
+  modeAB=false;
+  setBtnLigne('done');
+  updateSL();
+  showToast("Ligne droite tracée — B est déplaçable");
 }
+
 function updateSL(){
   if(!A||!B||!sl) return;
   sl.setLatLngs([[A.lat,A.lng],[B.lat,B.lng]]);
   const dk=(A.distanceTo(B)/1000).toFixed(2);
   slLayer.eachLayer(l=>{ if(l.options&&l.options.icon&&l.options.icon.options.className==="distance-label") slLayer.removeLayer(l); });
-  L.marker([(A.lat+B.lat)/2,(A.lng+B.lng)/2],{icon:L.divIcon({className:"distance-label",html:`📏 ${dk} km`,iconSize:[90,24]}),interactive:false}).addTo(slLayer);
+  L.marker([(A.lat+B.lat)/2,(A.lng+B.lng)/2],{
+    icon:L.divIcon({className:"distance-label",html:`📏 ${dk} km`,iconSize:[90,24]}),
+    interactive:false
+  }).addTo(slLayer);
+}
+
+function setBtnLigne(state){
+  const btn   = document.getElementById('btn-ligne');
+  const label = document.getElementById('btn-ligne-label');
+  if(!btn||!label) return;
+  btn.classList.remove('is-active','btn-ligne-done');
+  if(state==='A'){
+    btn.classList.add('is-active');
+    btn.querySelector('.act-icon').textContent='🅰️';
+    label.textContent='Tapez A…';
+  } else if(state==='B'){
+    btn.classList.add('is-active');
+    btn.querySelector('.act-icon').textContent='🅱️';
+    label.textContent='Tapez B…';
+  } else if(state==='done'){
+    btn.querySelector('.act-icon').textContent='📏';
+    label.textContent='Ligne tracée';
+  } else {
+    btn.querySelector('.act-icon').textContent='📏';
+    label.textContent='Ligne droite';
+  }
 }
 
 /* ── IMPORT GPX ── */
@@ -648,8 +697,7 @@ function clearAll(){
   manualPts=[]; manualCoords=[]; importedTrace=false;
   routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
   slLayer.clearLayers(); mA=null; mB=null; sl=null; A=null; B=null; modeAB=false;
-  document.getElementById("btn-a").classList.remove("is-active");
-  document.getElementById("btn-b").classList.remove("is-active");
+  setBtnLigne('idle');
   ['stat-dist','stat-dp','stat-dm','sp-dist','sp-dp','sp-dm','sp-ibp','stat-ibp'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='—'; });
   document.getElementById('distance').innerHTML='';
   const ob=document.getElementById('obtain'); if(ob) ob.innerHTML='';
