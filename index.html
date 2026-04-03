@@ -313,8 +313,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
     </div>
     <div class="opt-row" onclick="toggleOverlay('markers')">
       <span class="opt-icon">📌</span>
-      <div class="opt-text"><div class="opt-label">Points manuels</div><div class="opt-desc">Points de passage</div></div>
-      <span class="opt-arrow" id="ov-markers">●</span>
+      <div class="opt-text"><div class="opt-label">Points de tracé</div><div class="opt-desc">Afficher les points intermédiaires</div></div>
+      <span class="opt-arrow" id="ov-markers">○</span>
     </div>
   </div>
   <div class="opt-section">
@@ -380,13 +380,13 @@ const tfLayer =L.tileLayer("https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.
 const hikingOv=L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{maxZoom:18,opacity:.9});
 osmLayer.addTo(map);
 let curBase='osm';
-const ovState={hiking:false,route:true,markers:true};
+const ovState={hiking:false,route:true,markers:false};
 
-let markers=L.layerGroup().addTo(map);
+let markers=L.layerGroup(); // points manuels — masqués par défaut, activables en Options
 let routeLayer=L.layerGroup().addTo(map);
 let slLayer=L.layerGroup().addTo(map);
 let editMarkers=L.layerGroup().addTo(map);
-let editPts=L.layerGroup().addTo(map);
+let editPts=L.layerGroup(); // points de tracé — masqués par défaut
 let searchGrp=L.layerGroup().addTo(map);
 
 let manualPts=[],manualCoords=[];
@@ -463,7 +463,7 @@ async function rebuildRoute(){
     if(!d.features||!d.features.length) throw new Error("ORS vide");
     d.features[0].geometry.coordinates.forEach(c=>manualCoords.push([c[1],c[0],c[2]||0]));
     const lls=manualCoords.map(c=>[c[0],c[1]]);
-    L.polyline(lls,{color:"#52b788",weight:4,smoothFactor:1.2}).addTo(routeLayer);
+    L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
     mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
     refreshPts(); saveLocal();
   }catch(e){ console.error("ORS:",e); showToast("Erreur calcul ORS"); }
@@ -664,7 +664,7 @@ function mkEditable(lls){
       if(manualCoords[i]){ manualCoords[i][0]=n.lat; manualCoords[i][1]=n.lng; }
       routeLayer.clearLayers();
       const lls2=manualCoords.map(c=>[c[0],c[1]]);
-      L.polyline(lls2,{color:"#52b788",weight:4}).addTo(routeLayer);
+      L.polyline(lls2,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
       drawElevation(manualCoords.map(c=>c[2]||0),lls2); saveLocal();
     });
   });
@@ -680,7 +680,7 @@ function toggleAutoRecording(){
     if(recTrace.length>2){
       manualCoords=recTrace.map(p=>[p.lat,p.lng,p.ele||0]);
       routeLayer.clearLayers();
-      L.polyline(recTrace.map(p=>[p.lat,p.lng]),{color:"#52b788",weight:4}).addTo(routeLayer);
+      L.polyline(recTrace.map(p=>[p.lat,p.lng]),{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
       mkEditable(recTrace.map(p=>[p.lat,p.lng]));
       drawElevation(recTrace.map(p=>p.ele||0),recTrace.map(p=>[p.lat,p.lng]));
       saveLocal(); showChartArea(true);
@@ -727,7 +727,11 @@ function toggleOverlay(n){
   ovState[n]=!ovState[n];
   if(n==='hiking'){ ovState.hiking?hikingOv.addTo(map):map.removeLayer(hikingOv); document.getElementById('ov-hiking').textContent=ovState.hiking?'●':'○'; }
   if(n==='route') { ovState.route?routeLayer.addTo(map):map.removeLayer(routeLayer); document.getElementById('ov-route').textContent=ovState.route?'●':'○'; }
-  if(n==='markers'){ovState.markers?markers.addTo(map):map.removeLayer(markers); document.getElementById('ov-markers').textContent=ovState.markers?'●':'○'; }
+  if(n==='markers'){
+    ovState.markers?markers.addTo(map):map.removeLayer(markers);
+    ovState.markers?editPts.addTo(map):map.removeLayer(editPts);
+    document.getElementById('ov-markers').textContent=ovState.markers?'●':'○';
+  }
 }
 
 /* ── TABS ── */
@@ -770,7 +774,7 @@ function loadLocal(){
     const raw=localStorage.getItem(SKEY); if(!raw) return false;
     manualCoords=JSON.parse(raw); if(!manualCoords.length) return false;
     const lls=manualCoords.map(c=>[c[0],c[1]]);
-    L.polyline(lls,{color:"#52b788",weight:4}).addTo(routeLayer);
+    L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
     mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
     map.fitBounds(lls,{padding:[20,20]}); return true;
   }catch(e){ return false; }
