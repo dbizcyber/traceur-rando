@@ -643,13 +643,19 @@ function refreshPts(){
   });
 }
 function removeLastPoint(){ if(!manualPts.length) return; manualPts.pop(); rebuildRoute(); refreshPts(); }
-function confirmClearAll(){ if(!manualCoords.length&&!manualPts.length){ showToast("Rien à effacer"); return; } if(!confirm("Effacer toute la trace ?")) return; clearAll(); }
+function confirmClearAll(){ if(!manualCoords.length&&!manualPts.length&&!A&&!B&&!sl){ showToast("Rien à effacer"); return; } if(!confirm("Effacer la trace, les points A/B et la ligne droite ?")) return; clearAll(); }
 function clearAll(){
   manualPts=[]; manualCoords=[]; importedTrace=false;
   routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
-  if(mA){ slLayer.removeLayer(mA); mA=null; A=null; } if(mB){ slLayer.removeLayer(mB); mB=null; B=null; } if(sl){ slLayer.removeLayer(sl); sl=null; }
+  slLayer.clearLayers(); mA=null; mB=null; sl=null; A=null; B=null; modeAB=false;
+  document.getElementById("btn-a").classList.remove("is-active");
+  document.getElementById("btn-b").classList.remove("is-active");
   ['stat-dist','stat-dp','stat-dm','sp-dist','sp-dp','sp-dm','sp-ibp','stat-ibp'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='—'; });
   document.getElementById('distance').innerHTML='';
+  const ob=document.getElementById('obtain'); if(ob) ob.innerHTML='';
+  const ist=document.getElementById('importStatus'); if(ist) ist.textContent='';
+  const ibpDesc=document.getElementById('ibp-desc'); if(ibpDesc) ibpDesc.textContent='Via ibpindex.com — sans téléchargement';
+  const ibpArr=document.getElementById('ibp-arrow'); if(ibpArr) ibpArr.textContent='›';
   if(chart1){ chart1.destroy(); chart1=null; } if(chart2){ chart2.destroy(); chart2=null; }
   showChartArea(false); clearLocal();
 }
