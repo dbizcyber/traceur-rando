@@ -17,5 +17,39 @@
       "sizes": "512x512",
       "type": "image/png"
     }
+  ],
+  "description": "Application de tracé et planification de randonnées — La Marmotte Châteaurenard",
+  "scope": "./",
+  "lang": "fr",
+  "categories": [
+    "sports",
+    "navigation"
+  ],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "screenshots": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Carte de tracé"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouvelle trace",
+      "short_name": "Tracer",
+      "description": "Ouvrir la carte pour tracer une randonnée",
+      "url": "./index.html",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }
