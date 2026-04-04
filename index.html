@@ -265,7 +265,47 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 #btn-clear-tiles { background: rgba(229,62,62,.25); color: #fc8181; font-size: 12px; margin-top: 6px; width: 100%; padding: 8px; border-radius: 8px; border: none; cursor: pointer; }
 .tiles-count { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 8px; text-align: right; }
 
-/* Popup sentiers interdits *//* Popup sentiers interdits */
+/* Toast mise à jour disponible */
+#update-toast {
+  position: fixed; bottom: calc(var(--tab-h) + 80px);
+  left: 50%; transform: translateX(-50%);
+  background: #1e40af; color: #fff;
+  padding: 12px 18px; border-radius: 14px;
+  font-size: 13px; font-weight: 600;
+  z-index: 6000; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  white-space: nowrap; text-align: center;
+  max-width: 90vw;
+}
+#update-toast.visible { display: flex; align-items: center; gap: 10px; }
+#update-toast button {
+  background: #fff; color: #1e40af;
+  border: none; border-radius: 8px;
+  padding: 5px 12px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+
+/* Popup sentiers interdits *//* Toast mise à jour disponible */
+#update-toast {
+  position: fixed; bottom: calc(var(--tab-h) + 80px);
+  left: 50%; transform: translateX(-50%);
+  background: #1e40af; color: #fff;
+  padding: 12px 18px; border-radius: 14px;
+  font-size: 13px; font-weight: 600;
+  z-index: 6000; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  white-space: nowrap; text-align: center;
+  max-width: 90vw;
+}
+#update-toast.visible { display: flex; align-items: center; gap: 10px; }
+#update-toast button {
+  background: #fff; color: #1e40af;
+  border: none; border-radius: 8px;
+  padding: 5px 12px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+
+/* Popup sentiers interdits */
 .restricted-popup .leaflet-popup-content-wrapper {
   background: #3d0070;
   color: #fff;
@@ -454,7 +494,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 <div id="startupPopup">
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
-    <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.1 — Avril 2026</p>
+    <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.11 — Avril 2026</p>
     <p>Nouveautés : carte Thunderforest par défaut · options en bleu · trace GPS en temps réel (seuil 5 m, filtre vitesse) · téléchargement hors-ligne · sentiers interdits en violet.</p>
     <p style="font-size:11px;margin-top:8px;opacity:.55">Tapez la carte pour tracer · swipez le panneau bas · ⚙️ Options pour les couches</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
@@ -464,6 +504,10 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 <input type="file" id="importFile" accept=".gpx,application/gpx+xml,application/xml,text/xml">
 
 <div id="toast"></div>
+<div id="update-toast">
+  🔄 Nouvelle version disponible
+  <button onclick="applyUpdate()">Mettre à jour</button>
+</div>
 
 <script>
 /* ── CONFIG ── */
@@ -1163,6 +1207,26 @@ function showToast(txt,dur=2200){
 function showTooltip(t,d){ showToast(t,d); }
 
 /* ── INIT ── */
+/* ── Mise à jour PWA ── */
+function showUpdateToast(){
+  document.getElementById('update-toast').classList.add('visible');
+}
+function applyUpdate(){
+  document.getElementById('update-toast').classList.remove('visible');
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if(reg && reg.waiting){
+        /* Dire au nouveau SW de prendre le contrôle maintenant */
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        window.location.reload();
+      }
+    });
+  } else {
+    window.location.reload();
+  }
+}
+
 function closeStartupPopup(){ document.getElementById('startupPopup').style.display='none'; }
 
 /* ── DÉTECTION HORS-LIGNE ── */
@@ -1263,7 +1327,36 @@ window.addEventListener('load',()=>{
   document.getElementById('startupPopup').style.display='flex';
   updateOnlineStatus();
   if(loadLocal()){ showToast("Trace restaurée"); showChartArea(true); }
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(r=>console.log("SW",r.scope)).catch(e=>console.warn("SW:",e));
+  /* ── Enregistrement Service Worker avec détection de mise à jour ── */
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log("[SW] enregistré", reg.scope);
+
+      /* Vérifier immédiatement si une mise à jour est disponible */
+      reg.update();
+
+      /* Nouveau SW en attente d'installation */
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if(!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          /* Le nouveau SW est installé et prêt */
+          if(newSW.state === 'installed' && navigator.serviceWorker.controller){
+            showUpdateToast();
+          }
+        });
+      });
+
+    }).catch(e => console.warn("[SW] erreur:", e));
+
+    /* Quand le controller change (nouveau SW activé) → recharger */
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if(refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  }
   setTimeout(()=>map.invalidateSize(),300);
 });
 </script>
