@@ -28,7 +28,7 @@
   --neon:      #39ff14;
   --red:       #e53e3e;
   --tab-h:     calc(56px + env(safe-area-inset-bottom));
-  --hdr-h:     calc(54px + env(safe-area-inset-top));
+  --hdr-h:     calc(0px + env(safe-area-inset-top)); /* header supprimé */
   --sheet-peek:64px;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,38 +42,31 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 }
 
 /* HEADER */
-#app-header {
-  position: fixed; top: 0; left: 0; right: 0;
-  height: var(--hdr-h); background: var(--green);
-  z-index: 100; display: flex; align-items: flex-end;
-  padding: 0 12px 8px; gap: 10px;
-  padding-top: env(safe-area-inset-top);
-}
-.logo { font-size: 22px; line-height: 1; flex-shrink: 0; }
+/* header supprimé — remplacé par bouton 🔍 dans le sheet */
 #searchInput {
-  flex: 1; background: rgba(255,255,255,.15); border: none;
-  border-radius: 22px; padding: 8px 14px; font-size: 15px;
+  flex: 1; background: rgba(255,255,255,.1); border: none;
+  border-radius: 10px; padding: 9px 12px; font-size: 15px;
   color: #fff; outline: none; -webkit-appearance: none;
+  -webkit-user-select: text;
 }
-#searchInput::placeholder { color: rgba(255,255,255,.5); }
-#searchInput:focus { background: rgba(255,255,255,.22); }
-#search-btn {
-  width: 36px; height: 36px; border-radius: 50%; border: none;
-  background: rgba(255,255,255,.15); color: #fff; font-size: 16px;
-  cursor: pointer; flex-shrink: 0;
-}
+#searchInput::placeholder { color: rgba(255,255,255,.45); }
+#searchInput:focus { background: rgba(255,255,255,.16); }
 
 /* SEARCH RESULTS */
 #searchResults {
-  position: fixed; top: var(--hdr-h); left: 10px; right: 10px;
-  background: #fff; color: #111; border-radius: 0 0 12px 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.3); z-index: 200;
+  position: fixed; top: env(safe-area-inset-top); left: 10px; right: 10px;
+  background: #1a1a2e; color: #fff; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 200;
   display: none; max-height: 260px; overflow-y: auto;
 }
-.search-item { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-.search-item:active { background: #f0fff4; }
-.search-item .sname { font-size: 13px; }
-.search-item .stype { font-size: 11px; color: #888; margin-top: 2px; }
+.search-item { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
+.search-item:active { background: rgba(255,255,255,.08); }
+.search-item .sname { font-size: 13px; color: #fff; }
+.search-item .stype { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 2px; }
+#search-overlay { position: fixed; inset: 0; z-index: 190; display: none; }
+#search-overlay.visible { display: block; }
+#search-row { display: flex; gap: 8px; padding: 8px 12px 4px; align-items: center; border-bottom: 1px solid rgba(255,255,255,.07); }
+#search-close { background: none; border: none; color: rgba(255,255,255,.5); font-size: 18px; cursor: pointer; padding: 4px 8px; }
 
 /* FABs */
 .fab {
@@ -227,13 +220,16 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 </head>
 <body>
 
-<header id="app-header">
-  <span class="logo">🥾</span>
-  <input id="searchInput" type="search" placeholder="Rechercher un lieu…" autocomplete="off">
-  <button id="search-btn" onclick="searchLocation()">🔍</button>
-</header>
+<!-- header supprimé — recherche dans le sheet -->
 
-<div id="searchResults"></div>
+<div id="search-overlay"></div>
+<div id="searchResults">
+  <div id="search-row">
+    <input id="searchInput" type="search" placeholder="Rechercher un lieu…" autocomplete="off" inputmode="search">
+    <button id="search-close" onclick="closeSearch()">✕</button>
+  </div>
+  <div id="search-items"></div>
+</div>
 <div id="map"></div>
 
 <button class="fab" id="fab-gps"    onclick="centerGPS()">📍</button>
@@ -253,6 +249,9 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   <div class="sheet-actions">
     <button class="act-btn primary" onclick="exportGPX()">
       <span class="act-icon">💾</span><span class="act-label">Exporter GPX</span>
+    </button>
+    <button class="act-btn" onclick="openSearch()">
+      <span class="act-icon">🔍</span><span class="act-label">Rechercher</span>
     </button>
     <button class="act-btn" onclick="triggerImport()">
       <span class="act-icon">📂</span><span class="act-label">Importer GPX</span>
@@ -379,6 +378,9 @@ async function fetchAlt(lat,lng){
 /* ── CARTE ── */
 const map=L.map('map',{zoomControl:false}).setView([46.8,2.2],6);
 L.control.zoom({position:'topright'}).addTo(map);
+/* Détecter déplacement manuel — on ne panTo plus automatiquement si l'utilisateur a bougé */
+map.on('dragstart',  ()=>{ userMovedMap=true; });
+map.on('zoomstart',  ()=>{ userMovedMap=true; });
 
 const osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
 const tfLayer =L.tileLayer("https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",{maxZoom:22});
@@ -396,6 +398,7 @@ let searchGrp=L.layerGroup().addTo(map);
 
 let manualPts=[],manualCoords=[];
 let A=null,B=null,mA=null,mB=null,sl=null,modeAB=false,importedTrace=false;
+let userMovedMap=false; /* true si l'utilisateur a bougé/zoomé manuellement */
 
 /* ── GPS ── */
 let gpsMarker=null,gpsAttached=false,gpsTracking=false,recTrace=[];
@@ -471,6 +474,11 @@ async function rebuildRoute(){
     L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
     mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
     refreshPts(); saveLocal();
+    /* Focus sur le dernier point si l'utilisateur n'a pas bougé manuellement */
+    if(!userMovedMap && lls.length){
+      const last=lls[lls.length-1];
+      map.panTo(last,{animate:true,duration:.4});
+    }
   }catch(e){ console.error("ORS:",e); showToast("Erreur calcul ORS"); }
   finally{ orsRunning=false; }
 }
@@ -589,7 +597,7 @@ async function handleImport(file){
     L.polyline(lls,{color:"red",weight:4}).addTo(routeLayer);
     mkEditable(lls); map.fitBounds(lls,{padding:[20,20]});
     drawElevation(manualCoords.map(c=>c[2]||0),lls);
-    importedTrace=true; st.textContent='✅ Import OK';
+    importedTrace=true; userMovedMap=false; st.textContent='✅ Import OK';
     setTimeout(()=>st.textContent='',2000);
     showChartArea(true);
   }catch(e){ console.error("Import:",e); st.textContent='Erreur import'; alert("Erreur : "+e.message); }
@@ -694,7 +702,7 @@ function refreshPts(){
 function removeLastPoint(){ if(!manualPts.length) return; manualPts.pop(); rebuildRoute(); refreshPts(); }
 function confirmClearAll(){ if(!manualCoords.length&&!manualPts.length&&!A&&!B&&!sl){ showToast("Rien à effacer"); return; } if(!confirm("Effacer la trace, les points A/B et la ligne droite ?")) return; clearAll(); }
 function clearAll(){
-  manualPts=[]; manualCoords=[]; importedTrace=false;
+  manualPts=[]; manualCoords=[]; importedTrace=false; userMovedMap=false;
   routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
   slLayer.clearLayers(); mA=null; mB=null; sl=null; A=null; B=null; modeAB=false;
   setBtnLigne('idle');
@@ -744,31 +752,47 @@ function toggleAutoRecording(){
 }
 
 /* ── RECHERCHE ── */
+function openSearch(){
+  const rd=document.getElementById('searchResults');
+  const ov=document.getElementById('search-overlay');
+  rd.style.display='block'; ov.classList.add('visible');
+  setTimeout(()=>document.getElementById('searchInput').focus(),60);
+}
+function closeSearch(){
+  document.getElementById('searchResults').style.display='none';
+  document.getElementById('search-overlay').classList.remove('visible');
+  document.getElementById('searchInput').value='';
+  document.getElementById('search-items').innerHTML='';
+}
 async function searchLocation(){
   const q=document.getElementById('searchInput').value.trim();
-  const rd=document.getElementById('searchResults');
-  if(!q){ rd.style.display='none'; return; }
-  rd.style.display='block';
-  rd.innerHTML='<div class="search-item"><div class="sname">🔎 Recherche…</div></div>';
+  const items=document.getElementById('search-items');
+  if(!q){ items.innerHTML=''; return; }
+  items.innerHTML='<div class="search-item"><div class="sname">🔎 Recherche…</div></div>';
   try{
     const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&addressdetails=1&accept-language=fr`,{headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
-    if(!data.length){ rd.innerHTML='<div class="search-item"><div class="sname">Aucun résultat</div></div>'; return; }
-    rd.innerHTML='';
+    if(!data.length){ items.innerHTML='<div class="search-item"><div class="sname">Aucun résultat</div></div>'; return; }
+    items.innerHTML='';
     data.forEach(pl=>{
       const nm=pl.display_name||(pl.name||'Lieu inconnu');
       const lat=parseFloat(pl.lat),lng=parseFloat(pl.lon);
       const el=document.createElement('div'); el.className='search-item';
       el.innerHTML=`<div class="sname">${nm}</div><div class="stype">${pl.type||''}</div>`;
-      el.onclick=()=>{ map.setView([lat,lng],Math.max(13,pl.zoom?+pl.zoom:14)); searchGrp.clearLayers(); L.marker([lat,lng]).addTo(searchGrp).bindPopup(`<b>${nm}</b>`).openPopup(); rd.style.display='none'; };
-      rd.appendChild(el);
+      el.onclick=()=>{
+        map.setView([lat,lng],Math.max(13,pl.zoom?+pl.zoom:14));
+        userMovedMap=true;
+        searchGrp.clearLayers(); L.marker([lat,lng]).addTo(searchGrp).bindPopup(`<b>${nm}</b>`).openPopup();
+        closeSearch();
+      };
+      items.appendChild(el);
     });
-    const f=data[0]; if(f) map.setView([parseFloat(f.lat),parseFloat(f.lon)],Math.max(13,f.zoom?+f.zoom:14));
-  }catch(e){ rd.innerHTML=`<div class="search-item"><div class="sname" style="color:#e53e3e">Erreur: ${e.message}</div></div>`; }
+  }catch(e){ items.innerHTML=`<div class="search-item"><div class="sname" style="color:#fc8181">Erreur: ${e.message}</div></div>`; }
 }
 document.getElementById('searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); searchLocation(); } });
-document.addEventListener('click',e=>{ if(!document.getElementById('app-header').contains(e.target)) document.getElementById('searchResults').style.display='none'; });
+document.getElementById('searchInput').addEventListener('input',()=>{ searchLocation(); });
+document.getElementById('search-overlay').addEventListener('click',()=>closeSearch());
 
 /* ── COUCHES ── */
 function switchLayer(n){
