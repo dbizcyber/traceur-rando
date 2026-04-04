@@ -791,9 +791,19 @@ async function searchLocation(){
     });
   }catch(e){ items.innerHTML=`<div class="search-item"><div class="sname" style="color:#fc8181">Erreur: ${e.message}</div></div>`; }
 }
-document.getElementById('searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); searchLocation(); } });
-document.getElementById('searchInput').addEventListener('input',()=>{ searchLocation(); });
-document.getElementById('search-overlay').addEventListener('click',()=>closeSearch());
+/* Debounce recherche — 500ms après dernière frappe, min 3 caractères */
+let _searchTimer = null;
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); clearTimeout(_searchTimer); searchLocation(); }
+  if(e.key === 'Escape'){ closeSearch(); }
+});
+document.getElementById('searchInput').addEventListener('input', () => {
+  clearTimeout(_searchTimer);
+  const q = document.getElementById('searchInput').value.trim();
+  if(q.length < 3){ document.getElementById('search-items').innerHTML = ''; return; }
+  _searchTimer = setTimeout(searchLocation, 500);
+});
+document.getElementById('search-overlay').addEventListener('click', () => closeSearch());
 
 /* ── COUCHES ── */
 function switchLayer(n){
