@@ -434,8 +434,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 <div id="startupPopup">
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
-    <p>Traceur Rando v7.01 — interface mobile optimisée.<br>
-      Tapez sur la carte pour tracer un itinéraire. Swipez le panneau bas pour accéder aux actions. Activez le GPS pour un suivi en temps réel. Mise en cache des tuiles si réseau inexistant, Options → "Télécharger la zone visible" et Bouton "Vider le cache tuiles" + compteur affiché</p>
+    <p>Traceur Rando v7.0 — interface mobile optimisée.<br>
+      Tapez sur la carte pour tracer un itinéraire. Swipez le panneau bas pour accéder aux actions. Activez le GPS pour un suivi en temps réel.</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
   </div>
 </div>
@@ -485,15 +485,56 @@ let A=null,B=null,mA=null,mB=null,sl=null,modeAB=false,importedTrace=false;
 let userMovedMap=false; /* true si l'utilisateur a bougé/zoomé manuellement */
 
 /* ── GPS ── */
+const MIN_DIST_M   = 5;    // seuil minimum de déplacement (mètres)
+const MAX_ACCURACY = 50;   // précision GPS minimale requise (mètres)
+const MAX_SPEED    = 55;   // vitesse max plausible en rando (m/s ≈ 200 km/h)
 let gpsMarker=null,gpsAttached=false,gpsTracking=false,recTrace=[];
+let _lastRecPos=null, _lastRecTime=0;
+
 if(navigator.geolocation){
   navigator.geolocation.watchPosition(pos=>{
-    const{latitude:lat,longitude:lng,altitude:alt}=pos.coords;
+    const{latitude:lat,longitude:lng,altitude:alt,accuracy}=pos.coords;
     const ico=L.icon({iconUrl:"https://upload.wikimedia.org/wikipedia/commons/e/ec/RedDot.svg",iconSize:[14,14],iconAnchor:[7,7]});
+
+    /* ── Stocker la précision pour affichage ── */
     if(!gpsMarker){ gpsMarker=L.marker([lat,lng],{icon:ico}).addTo(map); map.setView([lat,lng],12); }
     else gpsMarker.setLatLng([lat,lng]);
     gpsMarker._alt=alt;
-    if(gpsTracking) recTrace.push({lat,lng,ele:alt||0});
+    gpsMarker._accuracy=accuracy;
+
+    /* ── Enregistrement avec filtres qualité ── */
+    if(gpsTracking){
+      const now = Date.now();
+      const newLL = L.latLng(lat,lng);
+
+      /* Filtre 1 : précision GPS insuffisante */
+      if(accuracy && accuracy > MAX_ACCURACY){
+        console.log(`[GPS] Point ignoré — précision trop faible: ${Math.round(accuracy)} m`);
+      } else if(_lastRecPos){
+        const dist = _lastRecPos.distanceTo(newLL);
+        const dt   = (now - _lastRecTime) / 1000; // secondes
+
+        /* Filtre 2 : déplacement trop faible (dérive statique) */
+        if(dist < MIN_DIST_M){
+          /* Point ignoré — pas assez de déplacement */
+        } else {
+          /* Filtre 3 : vitesse aberrante */
+          const speed = dt > 0 ? dist / dt : 0;
+          if(speed > MAX_SPEED){
+            console.log(`[GPS] Point ignoré — vitesse aberrante: ${Math.round(speed*3.6)} km/h`);
+          } else {
+            recTrace.push({lat,lng,ele:alt||0,acc:accuracy||0});
+            _lastRecPos  = newLL;
+            _lastRecTime = now;
+          }
+        }
+      } else {
+        /* Premier point de la trace */
+        recTrace.push({lat,lng,ele:alt||0,acc:accuracy||0});
+        _lastRecPos  = newLL;
+        _lastRecTime = now;
+      }
+    }
     if(!gpsAttached){ gpsAttached=true;
       gpsMarker.on('click',async()=>{
         const p=gpsMarker.getLatLng();
@@ -504,7 +545,8 @@ if(navigator.geolocation){
           const need=!cachedAltLL||L.latLng(cachedAltLL).distanceTo(p)>ALT_DIST;
           if(need&&now-lastAltRequest>ALT_THR){ try{ ta=await fetchAlt(p.lat,p.lng); cachedAlt=ta; cachedAltLL=p; lastAltRequest=now; }catch(e){} }
         }
-        gpsMarker.bindPopup(`<b>📍 Position</b><br>Lat:${p.lat.toFixed(6)}<br>Lon:${p.lng.toFixed(6)}<br><br>📡 GPS:${ga?ga+" m":"—"}<br>⛰️ Terrain:${ta?ta+" m":"—"}`).openPopup();
+        const acc = gpsMarker._accuracy ? `± ${Math.round(gpsMarker._accuracy)} m` : "—";
+        gpsMarker.bindPopup(`<b>📍 Position</b><br>Lat:${p.lat.toFixed(6)}<br>Lon:${p.lng.toFixed(6)}<br><br>📡 GPS:${ga?ga+" m":"—"}<br>⛰️ Terrain:${ta?ta+" m":"—"}<br>🎯 Précision:${acc}`).openPopup();
       });
     }
   },err=>console.warn("GPS:",err),{enableHighAccuracy:true});
@@ -820,7 +862,7 @@ function mkEditable(lls){
 function toggleAutoRecording(){
   gpsTracking=!gpsTracking;
   const btn=document.getElementById('tab-rec');
-  if(gpsTracking){ recTrace=[]; btn.classList.add('recording'); btn.querySelector('.tab-icon').textContent='⏹️'; showToast("Enregistrement démarré"); }
+  if(gpsTracking){ recTrace=[]; _lastRecPos=null; _lastRecTime=0; btn.classList.add('recording'); btn.querySelector('.tab-icon').textContent='⏹️'; showToast("Enregistrement démarré — seuil 5 m"); }
   else{
     btn.classList.remove('recording'); btn.querySelector('.tab-icon').textContent='⏺️';
     if(recTrace.length>2){
@@ -831,7 +873,7 @@ function toggleAutoRecording(){
       drawElevation(recTrace.map(p=>p.ele||0),recTrace.map(p=>[p.lat,p.lng]));
       saveLocal(); showChartArea(true);
     }
-    showToast("Enregistrement arrêté");
+    showToast(`Enregistrement arrêté — ${recTrace.length} points enregistrés`);
   }
 }
 
