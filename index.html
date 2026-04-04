@@ -764,7 +764,13 @@ function exportGPX(){
   const geo={type:"FeatureCollection",features:[{type:"Feature",geometry:{type:"LineString",coordinates:manualCoords.map(c=>[c[1],c[0],c[2]||0])},properties:{name:"Trace ORS"}}]};
   const gpx=togpx(geo);
   const blob=new Blob([gpx],{type:"application/gpx+xml"});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download="trace_complete.gpx"; a.click();
+  const _now=new Date();
+  const _dd=String(_now.getDate()).padStart(2,'0');
+  const _mm=String(_now.getMonth()+1).padStart(2,'0');
+  const _hh=String(_now.getHours()).padStart(2,'0');
+  const _min=String(_now.getMinutes()).padStart(2,'0');
+  const _fname=`trace_${_dd}-${_mm}-${_now.getFullYear()}_${_hh}h${_min}.gpx`;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=_fname; a.click();
   showChartArea(true);
 }
 /* ── IBP SILENCIEUX (GPX en mémoire → API ibpindex, sans téléchargement) ── */
