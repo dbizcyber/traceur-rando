@@ -403,7 +403,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
     <h3>Fond de carte</h3>
     <div class="layer-btns">
       <button class="layer-btn" id="layer-osm" onclick="switchLayer('osm')">OpenStreetMap</button>
-      <button class="layer-btn active" id="layer-tf"  onclick="switchLayer('tf')">Thunderforest</button>
+      <button class="layer-btn active" id="layer-tf"  onclick="switchLayer('tf')">Thunderforest Outdoors</button>
+      <button class="layer-btn" id="layer-tfl" onclick="switchLayer('tfl')">Thunderforest Landscape</button>
     </div>
   </div>
   <div class="opt-section">
@@ -495,7 +496,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
     <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.11 — Avril 2026</p>
-    <p>Nouveautés : carte Thunderforest par défaut · options en bleu · trace GPS en temps réel (seuil 5 m, filtre vitesse) · téléchargement hors-ligne · sentiers interdits en violet.</p>
+    <p>Nouveautés : carte Thunderforest par défaut + Landscape · options en bleu · trace GPS en temps réel (seuil 5 m, filtre vitesse) · téléchargement hors-ligne · sentiers interdits en violet.</p>
     <p style="font-size:11px;margin-top:8px;opacity:.55">Tapez la carte pour tracer · swipez le panneau bas · ⚙️ Options pour les couches</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
   </div>
@@ -531,7 +532,8 @@ map.on('dragstart',  ()=>{ userMovedMap=true; });
 map.on('zoomstart',  ()=>{ userMovedMap=true; });
 
 const osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
-const tfLayer =L.tileLayer("https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",{maxZoom:22});
+const tfLayer  = L.tileLayer("https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",{maxZoom:22});
+const tflLayer = L.tileLayer("https://tile.thunderforest.com/landscape/{z}/{x}/{y}.png?apikey=0ffff5950d8a4019bcede9aaeeecb57f",{maxZoom:22});
 const hikingOv=L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",{maxZoom:18,opacity:.9});
 tfLayer.addTo(map); /* Thunderforest affiché par défaut */
 let curBase='tf';
@@ -1030,10 +1032,18 @@ document.getElementById('search-overlay').addEventListener('click', () => closeS
 
 /* ── COUCHES ── */
 function switchLayer(n){
-  if(n==='osm'){ if(curBase!=='osm'){ map.removeLayer(tfLayer); osmLayer.addTo(map); curBase='osm'; } }
-  else          { if(curBase!=='tf') { map.removeLayer(osmLayer); tfLayer.addTo(map);  curBase='tf';  } }
-  document.getElementById('layer-osm').classList.toggle('active',n==='osm');
-  document.getElementById('layer-tf').classList.toggle('active', n==='tf');
+  /* Retirer le layer actuel */
+  if(curBase==='osm')  map.removeLayer(osmLayer);
+  if(curBase==='tf')   map.removeLayer(tfLayer);
+  if(curBase==='tfl')  map.removeLayer(tflLayer);
+  /* Activer le nouveau */
+  if(n==='osm')  { osmLayer.addTo(map);  curBase='osm'; }
+  if(n==='tf')   { tfLayer.addTo(map);   curBase='tf';  }
+  if(n==='tfl')  { tflLayer.addTo(map);  curBase='tfl'; }
+  /* Mettre à jour les boutons */
+  document.getElementById('layer-osm').classList.toggle('active', n==='osm');
+  document.getElementById('layer-tf').classList.toggle('active',  n==='tf');
+  document.getElementById('layer-tfl').classList.toggle('active', n==='tfl');
 }
 function toggleOverlay(n){
   ovState[n]=!ovState[n];
