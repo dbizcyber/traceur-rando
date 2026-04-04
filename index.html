@@ -215,7 +215,40 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   box-shadow: none !important;
 }
 .sl-label::before { display:none !important; }
-/* Popup sentiers interdits */
+/* Barre de statut hors-ligne */
+#offline-bar {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: var(--red); color: #fff;
+  font-size: 12px; font-weight: 600; text-align: center;
+  padding: calc(6px + env(safe-area-inset-top)) 12px 6px;
+  z-index: 5000; display: none;
+  padding-top: calc(4px + env(safe-area-inset-top));
+}
+#offline-bar.visible { display: block; }
+
+/* Modal pré-cache tuiles */
+#precache-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  z-index: 4000; display: none; align-items: center; justify-content: center;
+}
+#precache-modal.open { display: flex; }
+.precache-box {
+  background: #111827; border-radius: 16px; padding: 24px 20px;
+  width: 92vw; max-width: 360px; color: #fff;
+}
+.precache-box h3 { font-size: 16px; margin-bottom: 8px; }
+.precache-box p  { font-size: 13px; color: rgba(255,255,255,.6); margin-bottom: 16px; line-height: 1.55; }
+.precache-progress-wrap { background: rgba(255,255,255,.1); border-radius: 6px; height: 8px; margin: 12px 0; overflow: hidden; }
+.precache-progress-bar  { background: var(--neon); height: 100%; width: 0%; transition: width .3s; border-radius: 6px; }
+.precache-status { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 6px; min-height: 18px; }
+.precache-btns { display: flex; gap: 10px; margin-top: 16px; }
+.precache-btns button { flex: 1; padding: 11px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+#btn-start-precache { background: var(--neon); color: #000; }
+#btn-cancel-precache { background: rgba(255,255,255,.12); color: #fff; }
+#btn-clear-tiles { background: rgba(229,62,62,.25); color: #fc8181; font-size: 12px; margin-top: 6px; width: 100%; padding: 8px; border-radius: 8px; border: none; cursor: pointer; }
+.tiles-count { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 8px; text-align: right; }
+
+/* Popup sentiers interdits *//* Popup sentiers interdits */
 .restricted-popup .leaflet-popup-content-wrapper {
   background: #3d0070;
   color: #fff;
@@ -340,6 +373,17 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
     </div>
   </div>
   <div class="opt-section">
+    <h3>Hors-ligne</h3>
+    <div class="opt-row" onclick="openPrecacheModal()">
+      <span class="opt-icon">📥</span>
+      <div class="opt-text">
+        <div class="opt-label">Télécharger la zone visible</div>
+        <div class="opt-desc" id="offline-desc">Enregistre les tuiles pour randonner sans réseau</div>
+      </div>
+      <span class="opt-arrow">›</span>
+    </div>
+  </div>
+  <div class="opt-section">
     <h3>IBP</h3>
     <div class="opt-row" id="ibp-row" onclick="computeIBP()">
       <span class="opt-icon">🧮</span>
@@ -366,11 +410,32 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 </nav>
 
 <!-- POPUP -->
+<!-- Barre hors-ligne -->
+<div id="offline-bar">📵 Hors-ligne — la carte utilise le cache local</div>
+
+<!-- Modal pré-cache tuiles -->
+<div id="precache-modal">
+  <div class="precache-box">
+    <h3>📥 Télécharger la zone</h3>
+    <p>Télécharge les tuiles de carte de la zone visible (zoom 10→<span id="precache-zoom-label">15</span>) pour une utilisation hors-ligne.<br>Assurez-vous d'avoir une bonne connexion.</p>
+    <div class="precache-progress-wrap">
+      <div class="precache-progress-bar" id="precache-bar"></div>
+    </div>
+    <div class="precache-status" id="precache-status">Prêt à télécharger.</div>
+    <div class="tiles-count" id="tiles-count"></div>
+    <div class="precache-btns">
+      <button id="btn-start-precache" onclick="startPrecache()">⬇️ Télécharger</button>
+      <button id="btn-cancel-precache" onclick="closePrecacheModal()">Fermer</button>
+    </div>
+    <button id="btn-clear-tiles" onclick="clearTilesCache()">🗑️ Vider le cache tuiles</button>
+  </div>
+</div>
+
 <div id="startupPopup">
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
-    <p>Traceur Rando v7.0 — interface mobile optimisée.<br>
-      Tapez sur la carte pour tracer un itinéraire. Swipez le panneau bas pour accéder aux actions. Activez le GPS pour un suivi en temps réel.</p>
+    <p>Traceur Rando v7.01 — interface mobile optimisée.<br>
+      Tapez sur la carte pour tracer un itinéraire. Swipez le panneau bas pour accéder aux actions. Activez le GPS pour un suivi en temps réel. Mise en cache des tuiles si réseau inexistant, Options → "Télécharger la zone visible" et Bouton "Vider le cache tuiles" + compteur affiché</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
   </div>
 </div>
@@ -1003,8 +1068,104 @@ function showTooltip(t,d){ showToast(t,d); }
 
 /* ── INIT ── */
 function closeStartupPopup(){ document.getElementById('startupPopup').style.display='none'; }
+
+/* ── DÉTECTION HORS-LIGNE ── */
+function updateOnlineStatus(){
+  const bar = document.getElementById('offline-bar');
+  if(!navigator.onLine){ bar.classList.add('visible'); }
+  else { bar.classList.remove('visible'); }
+}
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+/* ── PRÉ-CACHE TUILES ── */
+function openPrecacheModal(){
+  const modal = document.getElementById('precache-modal');
+  const zoom  = Math.min(map.getZoom(), 16);
+  document.getElementById('precache-zoom-label').textContent = zoom;
+  document.getElementById('precache-status').textContent = 'Prêt à télécharger.';
+  document.getElementById('precache-bar').style.width = '0%';
+  document.getElementById('btn-start-precache').disabled = false;
+  document.getElementById('btn-start-precache').textContent = '⬇️ Télécharger';
+  modal.classList.add('open');
+  /* Infos cache existant */
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    navigator.serviceWorker.controller.postMessage({ type: 'TILES_INFO' });
+  }
+  switchTab('map');
+}
+function closePrecacheModal(){
+  document.getElementById('precache-modal').classList.remove('open');
+}
+
+function startPrecache(){
+  if(!('serviceWorker' in navigator) || !navigator.serviceWorker.controller){
+    showToast("Service Worker non disponible — rechargez l'appli"); return;
+  }
+  if(!navigator.onLine){ showToast("Connexion requise pour télécharger les tuiles"); return; }
+
+  const b    = map.getBounds();
+  const zoom = Math.min(map.getZoom(), 16);
+  const bounds = {
+    north: b.getNorth(), south: b.getSouth(),
+    east:  b.getEast(),  west:  b.getWest()
+  };
+
+  document.getElementById('btn-start-precache').disabled = true;
+  document.getElementById('btn-start-precache').textContent = '⏳ En cours…';
+  document.getElementById('precache-status').textContent = 'Connexion au Service Worker…';
+
+  navigator.serviceWorker.controller.postMessage({ type: 'PRECACHE_TILES', bounds, zoom });
+}
+
+function clearTilesCache(){
+  if(!confirm('Vider tout le cache de tuiles ?')) return;
+  if(navigator.serviceWorker.controller){
+    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_TILES' });
+  }
+}
+
+/* Réception des messages SW */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', e => {
+    const { type, fetched, total, errors, count, max, msg } = e.data || {};
+    const bar    = document.getElementById('precache-bar');
+    const status = document.getElementById('precache-status');
+    const tcount = document.getElementById('tiles-count');
+
+    if(type === 'PRECACHE_START'){
+      status.textContent = `Démarrage — ${total} tuiles à télécharger…`;
+    }
+    if(type === 'PRECACHE_PROGRESS'){
+      const pct = Math.round(fetched / total * 100);
+      bar.style.width = pct + '%';
+      status.textContent = `${fetched} / ${total} tuiles (${errors} erreurs)`;
+    }
+    if(type === 'PRECACHE_DONE'){
+      bar.style.width = '100%';
+      status.textContent = `✅ Terminé — ${fetched} tuiles téléchargées (${errors} erreurs)`;
+      document.getElementById('btn-start-precache').disabled = false;
+      document.getElementById('btn-start-precache').textContent = '⬇️ Télécharger';
+      showToast(`✅ Zone téléchargée — ${fetched} tuiles en cache`);
+    }
+    if(type === 'PRECACHE_ERROR'){
+      status.textContent = '❌ ' + msg;
+      document.getElementById('btn-start-precache').disabled = false;
+      document.getElementById('btn-start-precache').textContent = '⬇️ Télécharger';
+    }
+    if(type === 'TILES_INFO_RESULT'){
+      tcount.textContent = `Cache : ${count} / ${max} tuiles`;
+    }
+    if(type === 'CLEAR_TILES_DONE'){
+      showToast('Cache tuiles vidé');
+      tcount.textContent = 'Cache : 0 tuiles';
+      closePrecacheModal();
+    }
+  });
+}
 window.addEventListener('load',()=>{
   document.getElementById('startupPopup').style.display='flex';
+  updateOnlineStatus();
   if(loadLocal()){ showToast("Trace restaurée"); showChartArea(true); }
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(r=>console.log("SW",r.scope)).catch(e=>console.warn("SW:",e));
   setTimeout(()=>map.invalidateSize(),300);
