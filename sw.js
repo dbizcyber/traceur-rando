@@ -1,4 +1,4 @@
-const CACHE_NAME = "mapybibi-pwa-v2";
+const CACHE_NAME = "mapybibi-pwa-v3";
 
 const FILES_TO_CACHE = [
   "./",
@@ -18,6 +18,7 @@ const CDN_ORIGINS = [
   "tile.thunderforest.com",
   "tile.waymarkedtrails.org",
   "nominatim.openstreetmap.org",
+  "overpass-api.de",
   "api.openrouteservice.org",
   "www.ibpindex.com",
   "supabase.co",
