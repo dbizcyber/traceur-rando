@@ -639,72 +639,78 @@ function drawElevation(elevs,lls=[]){
 }
 
 /* ── ROUTAGE VALHALLA (proxy Supabase) avec fallback ORS ── */
-let orsRunning=false;
-let _pendingRebuild = false;
+let _routeAbort = null;  /* AbortController courant */
 
 async function rebuildRoute(){
-  if(orsRunning){ _pendingRebuild=true; return; }
-  orsRunning=true; _pendingRebuild=false;
+  /* Annuler le calcul précédent s'il est encore en cours */
+  if(_routeAbort){ _routeAbort.abort(); }
+  const ctrl = new AbortController();
+  _routeAbort = ctrl;
+
   if(manualPts.length<2){
     routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers(); manualCoords=[];
-    orsRunning=false; drawElevation([],[]); saveLocal();
-    if(_pendingRebuild) rebuildRoute();
-    return;
+    drawElevation([],[]); saveLocal(); return;
   }
 
-  try {
-    let ok = false;
-    let newCoords = [];
+  /* Snapshot des points au moment du calcul */
+  const pts = manualPts.slice();
+  let ok = false;
+  let newCoords = [];
 
-    /* ── Tentative 1 : Valhalla via proxy Supabase ── */
+  /* ── Tentative 1 : Valhalla via proxy Supabase ── */
+  try{
+    const r = await fetch(VALHALLA_URL, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locations: pts })
+    });
+    if(!r.ok) throw new Error("Valhalla proxy " + r.status);
+    const d = await r.json();
+    if(!d.coords || !d.coords.length) throw new Error("Valhalla vide");
+    d.coords.forEach((c, i) => newCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
+    ok = true;
+    console.log("[Route] Valhalla OK — " + d.coords.length + " points, pts=" + pts.length);
+  }catch(e){
+    if(e.name === "AbortError"){ console.log("[Route] annulé — nouveau calcul en cours"); return; }
+    console.warn("[Route] Valhalla échoué, fallback ORS:", e.message);
+  }
+
+  /* ── Fallback : ORS si Valhalla échoue ── */
+  if(!ok){
     try{
-      const r = await fetch(VALHALLA_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locations: manualPts })
+      const r=await fetch(ORS_URL,{
+        method:"POST", signal:ctrl.signal,
+        headers:{"Authorization":ORS_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({coordinates:pts,elevation:true,instructions:false,preference:"recommended"})
       });
-      if(!r.ok) throw new Error("Valhalla proxy " + r.status);
-      const d = await r.json();
-      if(!d.coords || !d.coords.length) throw new Error("Valhalla vide");
-      d.coords.forEach((c, i) => newCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
+      if(!r.ok) throw new Error("ORS "+r.status);
+      const d=await r.json();
+      if(!d.features||!d.features.length) throw new Error("ORS vide");
+      d.features[0].geometry.coordinates.forEach(c=>newCoords.push([c[1],c[0],c[2]||0]));
       ok = true;
-      console.log("[Route] Valhalla OK — " + d.coords.length + " points");
-    }catch(e){
-      console.warn("[Route] Valhalla échoué, fallback ORS:", e.message);
+      showToast("⚠️ Mode dégradé — ORS (50 pts max)");
+      console.log("[Route] ORS fallback OK");
+    }catch(e2){
+      if(e2.name === "AbortError"){ return; }
+      console.error("[Route] ORS:",e2);
+      showToast("Erreur calcul d'itinéraire");
     }
+  }
 
-    /* ── Fallback : ORS si Valhalla échoue ── */
-    if(!ok){
-      try{
-        const r=await fetch(ORS_URL,{method:"POST",headers:{"Authorization":ORS_KEY,"Content-Type":"application/json"},body:JSON.stringify({coordinates:manualPts,elevation:true,instructions:false,preference:"recommended"})});
-        if(!r.ok) throw new Error("ORS "+r.status);
-        const d=await r.json();
-        if(!d.features||!d.features.length) throw new Error("ORS vide");
-        d.features[0].geometry.coordinates.forEach(c=>newCoords.push([c[1],c[0],c[2]||0]));
-        ok = true;
-        showToast("⚠️ Mode dégradé — ORS (50 pts max)");
-        console.log("[Route] ORS fallback OK");
-      }catch(e2){
-        console.error("[Route] ORS:",e2);
-        showToast("Erreur calcul d'itinéraire");
-      }
-    }
+  /* Ignorer si ce calcul a été supplanté par un plus récent */
+  if(ctrl.signal.aborted) return;
 
-    /* ── Affichage seulement si on a une réponse valide ── */
-    if(ok && newCoords.length){
-      manualCoords = newCoords;
-      routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
-      const lls = manualCoords.map(c=>[c[0],c[1]]);
-      if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
-      L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-      mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
-      refreshPts(); saveLocal();
-      if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
-    }
-
-  } finally {
-    orsRunning=false;
-    if(_pendingRebuild) setTimeout(rebuildRoute, 50);
+  /* ── Affichage seulement si on a une réponse valide ── */
+  if(ok && newCoords.length){
+    manualCoords = newCoords;
+    routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
+    const lls = manualCoords.map(c=>[c[0],c[1]]);
+    if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
+    L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
+    mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+    refreshPts(); saveLocal();
+    if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
   }
 }
 
