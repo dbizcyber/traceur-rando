@@ -514,7 +514,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 /* ── CONFIG ── */
 /* ── Proxy Valhalla via Supabase Edge Function ── */
 const VALHALLA_URL = "https://whlxbfnmyqdflmxosfse.supabase.co/functions/v1/valhalla-proxy";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndobHhiZm5teXFkZmxteG9zZnNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3ODA5MTksImV4cCI6MjA4ODM1NjkxOX0.vf3sdnJRnnXyIx998fhPSIUPX0WS7KqDbvAwesCzOcE";
+const SUPABASE_ANON = "COLLER_ICI_VOTRE_CLE_ANON_SUPABASE";
 /* ORS gardé en fallback */
 const ORS_KEY  = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0=";
 const ORS_URL  = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
@@ -665,56 +665,58 @@ async function rebuildRoute(){
   routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers(); manualCoords=[];
   if(manualPts.length<2){ orsRunning=false; drawElevation([],[]); saveLocal(); return; }
 
-  let ok = false;
+  try {
+    let ok = false;
 
-  /* ── Tentative 1 : Valhalla via proxy Supabase ── */
-  try{
-    const r = await fetch(VALHALLA_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": SUPABASE_ANON,
-        "Authorization": "Bearer " + SUPABASE_ANON
-      },
-      body: JSON.stringify({ locations: manualPts })
-    });
-    if(!r.ok) throw new Error("Valhalla proxy " + r.status);
-    const d = await r.json();
-    if(!d.coords || !d.coords.length) throw new Error("Valhalla vide");
-    /* coords = [[lat,lng],...] ; elevations = [m,...] */
-    d.coords.forEach((c, i) => manualCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
-    const lls = manualCoords.map(c=>[c[0],c[1]]);
-    L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-    mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
-    refreshPts(); saveLocal();
-    if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
-    ok = true;
-    console.log("[Route] Valhalla OK — " + d.coords.length + " points");
-  }catch(e){
-    console.warn("[Route] Valhalla échoué, fallback ORS:", e.message);
-  }
-
-  /* ── Fallback : ORS si Valhalla échoue ── */
-  if(!ok){
+    /* ── Tentative 1 : Valhalla via proxy Supabase ── */
     try{
-      const r=await fetch(ORS_URL,{method:"POST",headers:{"Authorization":ORS_KEY,"Content-Type":"application/json"},body:JSON.stringify({coordinates:manualPts,elevation:true,instructions:false,preference:"recommended"})});
-      if(!r.ok) throw new Error("ORS "+r.status);
-      const d=await r.json();
-      if(!d.features||!d.features.length) throw new Error("ORS vide");
-      d.features[0].geometry.coordinates.forEach(c=>manualCoords.push([c[1],c[0],c[2]||0]));
-      const lls=manualCoords.map(c=>[c[0],c[1]]);
+      const r = await fetch(VALHALLA_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON,
+          "Authorization": "Bearer " + SUPABASE_ANON
+        },
+        body: JSON.stringify({ locations: manualPts })
+      });
+      if(!r.ok) throw new Error("Valhalla proxy " + r.status);
+      const d = await r.json();
+      if(!d.coords || !d.coords.length) throw new Error("Valhalla vide");
+      d.coords.forEach((c, i) => manualCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
+      const lls = manualCoords.map(c=>[c[0],c[1]]);
       L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
       mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
       refreshPts(); saveLocal();
       if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
-      showToast("⚠️ Mode dégradé — ORS (50 pts max)");
-      console.log("[Route] ORS fallback OK");
-    }catch(e2){
-      console.error("[Route] ORS:",e2);
-      showToast("Erreur calcul d'itinéraire");
+      ok = true;
+      console.log("[Route] Valhalla OK — " + d.coords.length + " points");
+    }catch(e){
+      console.warn("[Route] Valhalla échoué, fallback ORS:", e.message);
     }
+
+    /* ── Fallback : ORS si Valhalla échoue ── */
+    if(!ok){
+      try{
+        const r=await fetch(ORS_URL,{method:"POST",headers:{"Authorization":ORS_KEY,"Content-Type":"application/json"},body:JSON.stringify({coordinates:manualPts,elevation:true,instructions:false,preference:"recommended"})});
+        if(!r.ok) throw new Error("ORS "+r.status);
+        const d=await r.json();
+        if(!d.features||!d.features.length) throw new Error("ORS vide");
+        d.features[0].geometry.coordinates.forEach(c=>manualCoords.push([c[1],c[0],c[2]||0]));
+        const lls=manualCoords.map(c=>[c[0],c[1]]);
+        L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
+        mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+        refreshPts(); saveLocal();
+        if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
+        showToast("⚠️ Mode dégradé — ORS (50 pts max)");
+        console.log("[Route] ORS fallback OK");
+      }catch(e2){
+        console.error("[Route] ORS:",e2);
+        showToast("Erreur calcul d'itinéraire");
+      }
+    }
+  } finally {
+    orsRunning=false; /* TOUJOURS libérer le verrou */
   }
-  orsRunning=false;
 }
 
 /* ── CLIC CARTE ── */
