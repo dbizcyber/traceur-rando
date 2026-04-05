@@ -671,7 +671,11 @@ async function rebuildRoute(){
   try{
     const r = await fetch(VALHALLA_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON },
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON,
+        "Authorization": "Bearer " + SUPABASE_ANON
+      },
       body: JSON.stringify({ locations: manualPts })
     });
     if(!r.ok) throw new Error("Valhalla proxy " + r.status);
