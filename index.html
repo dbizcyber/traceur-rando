@@ -495,8 +495,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 <div id="startupPopup">
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
-    <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.1 — Avril 2026</p>
-    <p>Nouveautés : carte Thunderforest par défaut · options en bleu · trace GPS en temps réel (seuil 5 m, filtre vitesse) · téléchargement hors-ligne · sentiers interdits en violet.</p>
+    <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.12 — Avril 2026</p>
+    <p>Nouveautés : carte Thunderforest par défaut · valhalla · options en bleu · trace GPS en temps réel (seuil 5 m, filtre vitesse) · téléchargement hors-ligne · sentiers interdits en violet.</p>
     <p style="font-size:11px;margin-top:8px;opacity:.55">Tapez la carte pour tracer · swipez le panneau bas · ⚙️ Options pour les couches</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
   </div>
@@ -662,33 +662,26 @@ function drawElevation(elevs,lls=[]){
 let orsRunning=false;
 async function rebuildRoute(){
   if(orsRunning) return; orsRunning=true;
-  routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers(); manualCoords=[];
-  if(manualPts.length<2){ orsRunning=false; drawElevation([],[]); saveLocal(); return; }
+  if(manualPts.length<2){
+    routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers(); manualCoords=[];
+    orsRunning=false; drawElevation([],[]); saveLocal(); return;
+  }
 
   try {
     let ok = false;
+    let newCoords = [];
 
     /* ── Tentative 1 : Valhalla via proxy Supabase ── */
     try{
       const r = await fetch(VALHALLA_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON,
-          "Authorization": "Bearer " + SUPABASE_ANON
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locations: manualPts })
       });
       if(!r.ok) throw new Error("Valhalla proxy " + r.status);
       const d = await r.json();
       if(!d.coords || !d.coords.length) throw new Error("Valhalla vide");
-      d.coords.forEach((c, i) => manualCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
-      const lls = manualCoords.map(c=>[c[0],c[1]]);
-      if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
-      L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-      mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
-      refreshPts(); saveLocal();
-      if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
+      d.coords.forEach((c, i) => newCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
       ok = true;
       console.log("[Route] Valhalla OK — " + d.coords.length + " points");
     }catch(e){
@@ -702,13 +695,8 @@ async function rebuildRoute(){
         if(!r.ok) throw new Error("ORS "+r.status);
         const d=await r.json();
         if(!d.features||!d.features.length) throw new Error("ORS vide");
-        d.features[0].geometry.coordinates.forEach(c=>manualCoords.push([c[1],c[0],c[2]||0]));
-        const lls=manualCoords.map(c=>[c[0],c[1]]);
-        if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
-        L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-        mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
-        refreshPts(); saveLocal();
-        if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
+        d.features[0].geometry.coordinates.forEach(c=>newCoords.push([c[1],c[0],c[2]||0]));
+        ok = true;
         showToast("⚠️ Mode dégradé — ORS (50 pts max)");
         console.log("[Route] ORS fallback OK");
       }catch(e2){
@@ -716,8 +704,21 @@ async function rebuildRoute(){
         showToast("Erreur calcul d'itinéraire");
       }
     }
+
+    /* ── Affichage seulement si on a une réponse valide ── */
+    if(ok && newCoords.length){
+      manualCoords = newCoords;
+      routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
+      const lls = manualCoords.map(c=>[c[0],c[1]]);
+      if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
+      L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
+      mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+      refreshPts(); saveLocal();
+      if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
+    }
+
   } finally {
-    orsRunning=false; /* TOUJOURS libérer le verrou */
+    orsRunning=false;
   }
 }
 
