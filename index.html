@@ -285,26 +285,6 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   cursor: pointer; white-space: nowrap;
 }
 
-/* Popup sentiers interdits *//* Toast mise à jour disponible */
-#update-toast {
-  position: fixed; bottom: calc(var(--tab-h) + 80px);
-  left: 50%; transform: translateX(-50%);
-  background: #1e40af; color: #fff;
-  padding: 12px 18px; border-radius: 14px;
-  font-size: 13px; font-weight: 600;
-  z-index: 6000; display: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,.4);
-  white-space: nowrap; text-align: center;
-  max-width: 90vw;
-}
-#update-toast.visible { display: flex; align-items: center; gap: 10px; }
-#update-toast button {
-  background: #fff; color: #1e40af;
-  border: none; border-radius: 8px;
-  padding: 5px 12px; font-size: 12px; font-weight: 700;
-  cursor: pointer; white-space: nowrap;
-}
-
 /* Popup sentiers interdits */
 .restricted-popup .leaflet-popup-content-wrapper {
   background: #3d0070;
@@ -495,8 +475,8 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 <div id="startupPopup">
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
-    <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.12 — Avril 2026</p>
-    <p>Nouveautés : carte Thunderforest par défaut · valhalla · options en bleu · trace GPS en temps réel (seuil 5 m, filtre vitesse) · téléchargement hors-ligne · sentiers interdits en violet.</p>
+    <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.2 — Avril 2026</p>
+    <p>Nouveautés : routage Valhalla (1000 waypoints) · proxy Supabase sécurisé · tracé stable multi-points · Thunderforest Landscape · export GPX horodaté.</p>
     <p style="font-size:11px;margin-top:8px;opacity:.55">Tapez la carte pour tracer · swipez le panneau bas · ⚙️ Options pour les couches</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
   </div>
@@ -514,7 +494,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
 /* ── CONFIG ── */
 /* ── Proxy Valhalla via Supabase Edge Function ── */
 const VALHALLA_URL = "https://whlxbfnmyqdflmxosfse.supabase.co/functions/v1/valhalla-proxy";
-const SUPABASE_ANON = "COLLER_ICI_VOTRE_CLE_ANON_SUPABASE";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndobHhiZm5teXFkZmxteG9zZnNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3ODA5MTksImV4cCI6MjA4ODM1NjkxOX0.vf3sdnJRnnXyIx998fhPSIUPX0WS7KqDbvAwesCzOcE";
 /* ORS gardé en fallback */
 const ORS_KEY  = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImI4YjFjZDdiMTkyZWZmYTc0N2IyNjQ3MWMxNWJkYzAwMWNiMjI1NGZjNmYyMTI5MDgwN2ZmYzgyIiwiaCI6Im11cm11cjY0In0=";
 const ORS_URL  = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
