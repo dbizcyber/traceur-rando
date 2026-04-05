@@ -640,11 +640,16 @@ function drawElevation(elevs,lls=[]){
 
 /* ── ROUTAGE VALHALLA (proxy Supabase) avec fallback ORS ── */
 let orsRunning=false;
+let _pendingRebuild = false;
+
 async function rebuildRoute(){
-  if(orsRunning) return; orsRunning=true;
+  if(orsRunning){ _pendingRebuild=true; return; }
+  orsRunning=true; _pendingRebuild=false;
   if(manualPts.length<2){
     routeLayer.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers(); manualCoords=[];
-    orsRunning=false; drawElevation([],[]); saveLocal(); return;
+    orsRunning=false; drawElevation([],[]); saveLocal();
+    if(_pendingRebuild) rebuildRoute();
+    return;
   }
 
   try {
@@ -699,6 +704,7 @@ async function rebuildRoute(){
 
   } finally {
     orsRunning=false;
+    if(_pendingRebuild) setTimeout(rebuildRoute, 50);
   }
 }
 
