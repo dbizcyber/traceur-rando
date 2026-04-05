@@ -476,7 +476,7 @@ html, body { height: 100%; font-family: -apple-system, 'Segoe UI', Arial, sans-s
   <div class="popup-box">
     <h3>🥾 MapiBiBi — Bienvenue</h3>
     <p style="font-size:12px;margin-bottom:6px;opacity:.6">v7.2 — Avril 2026</p>
-    <p>Nouveautés : routage Valhalla (1000 waypoints) · proxy Supabase sécurisé · tracé stable multi-points · Thunderforest Landscape · export GPX horodaté.</p>
+    <p>Nouveautés : routage Valhalla (1000 waypoints) · proxy Supabase sécurisé · tracé stable multi-points · Thunderforest Landscape · export GPX horodaté · départ 🟢 / arrivée 🔴.</p>
     <p style="font-size:11px;margin-top:8px;opacity:.55">Tapez la carte pour tracer · swipez le panneau bas · ⚙️ Options pour les couches</p>
     <button onclick="closeStartupPopup()">C'est parti 🥾</button>
   </div>
@@ -532,6 +532,7 @@ let searchGrp=L.layerGroup().addTo(map);
 let restrictedLayer=L.layerGroup(); /* sentiers interdits — masqués par défaut */
 
 let manualPts=[],manualCoords=[];
+let startMarker=null, endMarker=null; /* marqueurs départ 🟢 / arrivée 🔴 */
 let A=null,B=null,mA=null,mB=null,sl=null,modeAB=false,importedTrace=false;
 let userMovedMap=false; /* true si l'utilisateur a bougé/zoomé manuellement */
 
@@ -708,7 +709,7 @@ async function rebuildRoute(){
     const lls = manualCoords.map(c=>[c[0],c[1]]);
     if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
     L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-    mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+    mkEditable(lls); updateStartEndMarkers(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
     refreshPts(); saveLocal();
     if(!userMovedMap && lls.length) map.panTo(lls[lls.length-1],{animate:true,duration:.4});
   }
@@ -826,7 +827,7 @@ async function handleImport(file){
     coords.forEach(c=>{ if(c.length>=2) manualCoords.push([c[1],c[0],c[2]||0]); });
     const lls=manualCoords.map(c=>[c[0],c[1]]);
     L.polyline(lls,{color:"red",weight:4}).addTo(routeLayer);
-    mkEditable(lls); map.fitBounds(lls,{padding:[20,20]});
+    mkEditable(lls); updateStartEndMarkers(lls); map.fitBounds(lls,{padding:[20,20]});
     drawElevation(manualCoords.map(c=>c[2]||0),lls);
     importedTrace=true; userMovedMap=false; st.textContent='✅ Import OK';
     setTimeout(()=>st.textContent='',2000);
@@ -940,6 +941,8 @@ function removeLastPoint(){ if(!manualPts.length) return; manualPts.pop(); rebui
 function confirmClearAll(){ if(!manualCoords.length&&!manualPts.length&&!A&&!B&&!sl){ showToast("Rien à effacer"); return; } if(!confirm("Effacer la trace, les points A/B et la ligne droite ?")) return; clearAll(); }
 function clearAll(){
   manualPts=[]; manualCoords=[]; importedTrace=false; userMovedMap=false; livePolyline=null;
+  if(startMarker){ map.removeLayer(startMarker); startMarker=null; }
+  if(endMarker){   map.removeLayer(endMarker);   endMarker=null; }
   routeLayer.clearLayers(); markers.clearLayers(); editMarkers.clearLayers(); editPts.clearLayers();
   slLayer.clearLayers(); mA=null; mB=null; sl=null; A=null; B=null; modeAB=false;
   setBtnLigne('idle');
@@ -952,6 +955,34 @@ function clearAll(){
   if(chart1){ chart1.destroy(); chart1=null; } if(chart2){ chart2.destroy(); chart2=null; }
   showChartArea(false); clearLocal();
 }
+/* ── Marqueurs départ (vert) et arrivée (rouge) ── */
+function updateStartEndMarkers(lls){
+  if(startMarker){ map.removeLayer(startMarker); startMarker=null; }
+  if(endMarker){   map.removeLayer(endMarker);   endMarker=null; }
+  if(!lls || lls.length < 1) return;
+
+  const iconStart = L.divIcon({
+    className: '',
+    html: '<div style="width:22px;height:22px;border-radius:50%;background:#16a34a;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700">D</div>',
+    iconSize: [22,22], iconAnchor: [11,11]
+  });
+  const iconEnd = L.divIcon({
+    className: '',
+    html: '<div style="width:22px;height:22px;border-radius:50%;background:#dc2626;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700">A</div>',
+    iconSize: [22,22], iconAnchor: [11,11]
+  });
+
+  startMarker = L.marker(lls[0], {icon: iconStart, zIndexOffset: 1000})
+    .addTo(map)
+    .bindTooltip("Départ", {direction:'top', offset:[0,-14]});
+
+  if(lls.length > 1){
+    endMarker = L.marker(lls[lls.length-1], {icon: iconEnd, zIndexOffset: 1000})
+      .addTo(map)
+      .bindTooltip("Arrivée", {direction:'top', offset:[0,-14]});
+  }
+}
+
 function mkEditable(lls){
   editMarkers.clearLayers();
   lls.forEach((ll,i)=>{
@@ -1004,8 +1035,9 @@ function toggleAutoRecording(){
       manualCoords=recTrace.map(p=>[p.lat,p.lng,p.ele||0]);
       routeLayer.clearLayers();
       L.polyline(recTrace.map(p=>[p.lat,p.lng]),{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-      mkEditable(recTrace.map(p=>[p.lat,p.lng]));
-      drawElevation(recTrace.map(p=>p.ele||0),recTrace.map(p=>[p.lat,p.lng]));
+      const recLls = recTrace.map(p=>[p.lat,p.lng]);
+      mkEditable(recLls); updateStartEndMarkers(recLls);
+      drawElevation(recTrace.map(p=>p.ele||0),recLls);
       saveLocal(); showChartArea(true);
     }
     showToast(`Enregistrement arrêté — ${recTrace.length} points enregistrés`);
@@ -1237,7 +1269,7 @@ function loadLocal(){
     manualCoords=JSON.parse(raw); if(!manualCoords.length) return false;
     const lls=manualCoords.map(c=>[c[0],c[1]]);
     L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
-    mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
+    mkEditable(lls); updateStartEndMarkers(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
     map.fitBounds(lls,{padding:[20,20]}); return true;
   }catch(e){ return false; }
 }
