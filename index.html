@@ -684,6 +684,7 @@ async function rebuildRoute(){
       if(!d.coords || !d.coords.length) throw new Error("Valhalla vide");
       d.coords.forEach((c, i) => manualCoords.push([c[0], c[1], d.elevations?.[i] || 0]));
       const lls = manualCoords.map(c=>[c[0],c[1]]);
+      if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
       L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
       mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
       refreshPts(); saveLocal();
@@ -703,6 +704,7 @@ async function rebuildRoute(){
         if(!d.features||!d.features.length) throw new Error("ORS vide");
         d.features[0].geometry.coordinates.forEach(c=>manualCoords.push([c[1],c[0],c[2]||0]));
         const lls=manualCoords.map(c=>[c[0],c[1]]);
+        if(!map.hasLayer(routeLayer)) routeLayer.addTo(map);
         L.polyline(lls,{color:"#e53e3e",weight:3,smoothFactor:1.5}).addTo(routeLayer);
         mkEditable(lls); drawElevation(manualCoords.map(c=>c[2]||0),lls);
         refreshPts(); saveLocal();
